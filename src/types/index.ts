@@ -1,34 +1,48 @@
 export interface Employee {
   id: string;
   name: string;
-  dateOfBirth: string;
-  maritalStatus: string;
-  email: string;
-  phone: string;
-  address: string;
+  dateOfBirth?: string;
+  maritalStatus?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
   position: string;
   department: string;
-  joinDate: string;
-  employmentType: string;
+  joinDate?: string;
+  employmentType?: string;
   baseSalary: number;
-  payrollFrequency: string;
-  bankAccount: string;
+  payrollFrequency?: string;
+  bankAccount?: string;
   status: "active" | "inactive";
-  sssNumber: string;
-  philHealthNumber: string;
-  pagIbigNumber: string;
-  tin: string;
-  taxStatus: string;
+  sssNumber?: string;
+  philHealthNumber?: string;
+  pagIbigNumber?: string;
+  tin?: string;
+  taxStatus?: string;
   overtimeRate?: number; // per hour
   religion: "islam" | "kristen" | "katolik" | "hindu" | "budha" | "other";
   isManagement: boolean; // untuk menentukan apakah dapat tips atau tidak
-  holidaySettings?: {
-    christmas: boolean;
-    new_year: boolean;
-    holy_week: boolean;
-    independence_day: boolean;
-    anniversary_bonus: boolean;
+  // Allowances and deductions used throughout the app (seed provides these)
+  allowances: {
+    transport?: number;
+    meal?: number;
+    bonus?: number;
+    overtime?: number;
+    tips?: number;
+    holidayAllowance?: number;
   };
+  deductions: {
+    tax?: number;
+    insurance?: number;
+    other?: number;
+    cooperativeFund?: number;
+    healthInsurance?: number;
+    loanDeduction?: number;
+    ppn?: number;
+  };
+
+  // holidaySettings shape varies per seed; accept flexible keys
+  holidaySettings?: Record<string, boolean>;
 }
 
 export interface PayrollEntry {

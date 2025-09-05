@@ -46,7 +46,7 @@ export default function DashboardLayout() {
       )}
       {/* Sidebar */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 transition-transform duration-300 ease-in-out lg:transition-none`}
+        className={`fixed inset-y-0 z-50 ${sidebarOpen ? 'left-0' : '-left-full'} lg:left-0 lg:z-auto transition-all duration-300 ease-in-out w-64 lg:w-72`}
       >
         <Sidebar
           activeTab={activeTab}
@@ -57,7 +57,7 @@ export default function DashboardLayout() {
         />
       </div>
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-72">
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-auto">{renderContent()}</main>
       </div>

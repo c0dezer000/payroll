@@ -115,19 +115,19 @@ const Dashboard: React.FC = () => {
 	return (
 		<div className="p-4 sm:p-6 lg:p-8 xl:p-12 space-y-6 sm:space-y-8 lg:space-y-12">
 			{/* Company Header */}
-			<div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 rounded-2xl lg:rounded-3xl p-6 sm:p-8 lg:p-10 xl:p-12 text-white shadow-2xl">
+			<div className="bg-white dark:bg-slate-900 rounded-2xl lg:rounded-3xl p-6 sm:p-8 lg:p-10 xl:p-12 text-slate-900 dark:text-white shadow-lg border border-slate-200 dark:border-slate-700">
 				<div className="flex flex-col space-y-6 lg:space-y-8">
 					<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-6 sm:space-y-0">
 						<div className="flex-1">
 							<div className="flex items-center space-x-4 sm:space-x-6 mb-4 sm:mb-6">
-								<div className="bg-white/20 backdrop-blur-sm p-3 sm:p-4 lg:p-5 rounded-xl lg:rounded-2xl">
-									<Waves className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10" />
+								<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+									<Waves className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10 text-slate-600 dark:text-slate-400" />
 								</div>
 								<div>
-									<h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold">
+									<h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white">
 										Enjoy Dive
 									</h1>
-									<p className="text-slate-300 text-base sm:text-lg lg:text-xl mt-1">
+									<p className="text-slate-500 dark:text-slate-400 text-base sm:text-lg lg:text-xl mt-1">
 										Premier Diving Center in Bali
 									</p>
 								</div>
@@ -135,31 +135,31 @@ const Dashboard: React.FC = () => {
 
 							<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 text-sm sm:text-base">
 								<div className="flex items-center space-x-3">
-									<MapPin className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-slate-300" />
-									<span className="text-slate-200 truncate">
+									<MapPin className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-slate-600 dark:text-slate-400" />
+										<span className="text-slate-900 dark:text-slate-200 truncate">
 										Sanur Beach, Bali, Indonesia
 									</span>
 								</div>
 								<div className="flex items-center space-x-3">
-									<Phone className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-slate-300" />
-									<span className="text-slate-200">+62 361 288 829</span>
+									<Phone className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-slate-600 dark:text-slate-400" />
+									<span className="text-slate-900 dark:text-slate-200">+62 361 288 829</span>
 								</div>
 								<div className="flex items-center space-x-3 md:col-span-2 xl:col-span-1">
-									<Mail className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-slate-300" />
-									<span className="text-slate-200 truncate">
+									<Mail className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-slate-600 dark:text-slate-400" />
+									<span className="text-slate-900 dark:text-slate-200 truncate">
 										info@enjoydive.com
 									</span>
 								</div>
 							</div>
 						</div>
 
-						<div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+							<div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
 							<div className="text-center sm:text-right">
-								<p className="text-slate-300 text-sm">Payroll Period</p>
-								<p className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1">
+								<p className="text-slate-500 dark:text-slate-400 text-sm">Payroll Period</p>
+								<p className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 text-slate-900 dark:text-white">
 									{currentPeriod}
 								</p>
-								<p className="text-slate-400 text-xs mt-1">
+								<p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
 									{trendDirection === "up"
 										? "↗ Trending Up"
 										: trendDirection === "down"
@@ -243,8 +243,8 @@ const Dashboard: React.FC = () => {
 									Monthly Payroll
 								</p>
 							</div>
-							<div className="bg-emerald-100 dark:bg-emerald-900/30 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-								<DollarSign className="h-6 w-6 lg:h-8 lg:w-8 text-emerald-600 dark:text-emerald-400" />
+							<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+								<DollarSign className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 							</div>
 						</div>
 
@@ -281,8 +281,8 @@ const Dashboard: React.FC = () => {
 									Departments
 								</p>
 							</div>
-							<div className="bg-violet-100 dark:bg-violet-900/30 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-								<Building className="h-6 w-6 lg:h-8 lg:w-8 text-violet-600 dark:text-violet-400" />
+							<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+								<Building className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 							</div>
 						</div>
 
@@ -312,8 +312,8 @@ const Dashboard: React.FC = () => {
 									Avg. Salary
 								</p>
 							</div>
-							<div className="bg-amber-100 dark:bg-amber-900/30 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-								<TrendingUp className="h-6 w-6 lg:h-8 lg:w-8 text-amber-600 dark:text-amber-400" />
+							<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+								<TrendingUp className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 							</div>
 						</div>
 
@@ -350,37 +350,37 @@ const Dashboard: React.FC = () => {
 				{/* Quick Stats Panel */}
 				<div className="space-y-6">
 					{/* Payroll Summary */}
-					<div className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 rounded-xl lg:rounded-2xl p-6 border border-emerald-200 dark:border-emerald-800">
+					<div className="bg-white dark:bg-slate-800 rounded-xl lg:rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
 						<div className="flex items-center space-x-3 mb-4">
-							<div className="bg-emerald-600 p-2 rounded-lg">
-								<DollarSign className="h-5 w-5 text-white" />
+							<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+								<DollarSign className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 							</div>
-							<h4 className="font-bold text-emerald-800 dark:text-emerald-400">
+							<h4 className="font-bold text-slate-900 dark:text-white">
 								Payroll Summary
 							</h4>
 						</div>
 						<div className="space-y-3">
 							<div className="flex justify-between items-center">
-								<span className="text-emerald-700 dark:text-emerald-300 text-sm">
+								<span className="text-slate-500 dark:text-slate-400 text-sm">
 									Current Period
 								</span>
-								<span className="font-bold text-emerald-800 dark:text-emerald-200">
+								<span className="font-bold text-slate-900 dark:text-white">
 									{currentPeriod}
 								</span>
 							</div>
 							<div className="flex justify-between items-center">
-								<span className="text-emerald-700 dark:text-emerald-300 text-sm">
+								<span className="text-slate-500 dark:text-slate-400 text-sm">
 									Total Amount
 								</span>
-								<span className="font-bold text-emerald-800 dark:text-emerald-200">
+								<span className="font-bold text-slate-900 dark:text-white">
 									{formatCurrency(stats.totalPayroll).replace("Rp", "Rp ")}
 								</span>
 							</div>
 							<div className="flex justify-between items-center">
-								<span className="text-emerald-700 dark:text-emerald-300 text-sm">
+								<span className="text-slate-500 dark:text-slate-400 text-sm">
 									Per Employee
 								</span>
-								<span className="font-bold text-emerald-800 dark:text-emerald-200">
+								<span className="font-bold text-slate-900 dark:text-white">
 									{formatCurrency(avgSalary).replace("Rp", "Rp ")}
 								</span>
 							</div>
@@ -388,37 +388,37 @@ const Dashboard: React.FC = () => {
 					</div>
 
 					{/* Performance Metrics */}
-					<div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl lg:rounded-2xl p-6 border border-blue-200 dark:border-blue-800">
+					<div className="bg-white dark:bg-slate-800 rounded-xl lg:rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
 						<div className="flex items-center space-x-3 mb-4">
-							<div className="bg-blue-600 p-2 rounded-lg">
-								<Target className="h-5 w-5 text-white" />
+							<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+								<Target className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 							</div>
-							<h4 className="font-bold text-blue-800 dark:text-blue-400">
+							<h4 className="font-bold text-slate-900 dark:text-white">
 								Performance
 							</h4>
 						</div>
 						<div className="space-y-3">
 							<div className="flex justify-between items-center">
-								<span className="text-blue-700 dark:text-blue-300 text-sm">
+								<span className="text-slate-500 dark:text-slate-400 text-sm">
 									Employee Retention
 								</span>
-								<span className="font-bold text-blue-800 dark:text-blue-200">
+								<span className="font-bold text-slate-900 dark:text-white">
 									98%
 								</span>
 							</div>
 							<div className="flex justify-between items-center">
-								<span className="text-blue-700 dark:text-blue-300 text-sm">
+								<span className="text-slate-500 dark:text-slate-400 text-sm">
 									Payroll Accuracy
 								</span>
-								<span className="font-bold text-blue-800 dark:text-blue-200">
+								<span className="font-bold text-slate-900 dark:text-white">
 									100%
 								</span>
 							</div>
 							<div className="flex justify-between items-center">
-								<span className="text-blue-700 dark:text-blue-300 text-sm">
+								<span className="text-slate-500 dark:text-slate-400 text-sm">
 									On-time Processing
 								</span>
-								<span className="font-bold text-blue-800 dark:text-blue-200">
+								<span className="font-bold text-slate-900 dark:text-white">
 									100%
 								</span>
 							</div>
@@ -522,11 +522,11 @@ const Dashboard: React.FC = () => {
 				</h3>
 				<div className="space-y-4 sm:space-y-6">
 					<div
-						className="flex items-start space-x-4 p-4 sm:p-6 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 hover:shadow-lg transition-all duration-300 cursor-pointer"
+						className="flex items-start space-x-4 p-4 sm:p-6 bg-white dark:bg-slate-800 rounded-xl lg:rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer"
 						onClick={() => handleQuickAction("payroll")}
 					>
-						<div className="bg-slate-600 p-3 rounded-xl flex-shrink-0">
-							<Calendar className="h-5 w-5 text-white" />
+						<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+							<Calendar className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 						</div>
 						<div className="flex-1 min-w-0">
 							<p className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">
@@ -543,11 +543,11 @@ const Dashboard: React.FC = () => {
 					</div>
 
 					<div
-						className="flex items-start space-x-4 p-4 sm:p-6 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800 hover:shadow-lg transition-all duration-300 cursor-pointer"
+						className="flex items-start space-x-4 p-4 sm:p-6 bg-white dark:bg-slate-800 rounded-xl lg:rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer"
 						onClick={() => handleQuickAction("whatsapp")}
 					>
-						<div className="bg-emerald-600 p-3 rounded-xl flex-shrink-0">
-							<MessageSquare className="h-5 w-5 text-white" />
+						<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+							<MessageSquare className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 						</div>
 						<div className="flex-1 min-w-0">
 							<p className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">
@@ -564,17 +564,17 @@ const Dashboard: React.FC = () => {
 					</div>
 
 					<div
-						className="flex items-start space-x-4 p-4 sm:p-6 bg-violet-50 dark:bg-violet-900/20 rounded-xl border border-violet-200 dark:border-violet-800 hover:shadow-lg transition-all duration-300 cursor-pointer"
+						className="flex items-start space-x-4 p-4 sm:p-6 bg-white dark:bg-slate-800 rounded-xl lg:rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer"
 						onClick={() => handleQuickAction("employees")}
 					>
-						<div className="bg-violet-600 p-3 rounded-xl flex-shrink-0">
-							<Users className="h-5 w-5 text-white" />
+						<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+							<Users className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 						</div>
 						<div className="flex-1 min-w-0">
 							<p className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">
 								New employee added
 							</p>
-							<p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+								<p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
 								Ketut Widiastuti joined Cleaning Service • Employee ID: EMP033
 							</p>
 						</div>
@@ -583,9 +583,9 @@ const Dashboard: React.FC = () => {
 						</span>
 					</div>
 
-					<div className="flex items-start space-x-4 p-4 sm:p-6 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:shadow-lg transition-all duration-300">
-						<div className="bg-amber-600 p-3 rounded-xl flex-shrink-0">
-							<Activity className="h-5 w-5 text-white" />
+					<div className="flex items-start space-x-4 p-4 sm:p-6 bg-white dark:bg-slate-800 rounded-xl lg:rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300">
+						<div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+							<Activity className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
 						</div>
 						<div className="flex-1 min-w-0">
 							<p className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">

@@ -18,6 +18,22 @@ function writeStore(records: AttendanceRecord[]) {
 }
 
 export async function fetchAttendance(employeeId?: string, start?: string, end?: string): Promise<AttendanceRecord[]> {
+  // Try API first
+  try {
+    const params = new URLSearchParams();
+    if (employeeId) params.set("employeeId", employeeId);
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    const res = await fetch(`/api/attendance?${params.toString()}`);
+    if (res.ok) {
+      const data = await res.json();
+      return data as AttendanceRecord[];
+    }
+  } catch (e) {
+    // ignore and fallback to localStorage
+    console.debug("attendanceClient: API fetch failed, falling back to localStorage", e);
+  }
+
   const all = readStore();
   let filtered = all;
   if (employeeId) filtered = filtered.filter((r) => r.employeeId === employeeId);
@@ -36,6 +52,22 @@ export async function setAttendanceForDate(
   date: string,
   opts: { timeInISO?: string | null; timeOutISO?: string | null }
 ): Promise<AttendanceRecord> {
+  // Try writing to API first
+  try {
+    const res = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId, date, timeIn: opts.timeInISO, timeOut: opts.timeOutISO }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json as AttendanceRecord;
+    }
+  } catch (e) {
+    console.debug('attendanceClient: API write failed, falling back to localStorage', e);
+  }
+
+  // Fallback: write to local storage (offline)
   const records = readStore();
   let rec = records.find((r) => r.employeeId === employeeId && r.date === date);
   if (!rec) {
@@ -57,7 +89,7 @@ export async function setAttendanceForDate(
   if (typeof opts.timeInISO !== "undefined") rec.timeIn = opts.timeInISO;
   if (typeof opts.timeOutISO !== "undefined") rec.timeOut = opts.timeOutISO;
 
-  // Recompute derived fields
+  // Recompute derived fields (same logic as server)
   if (rec.timeIn && rec.timeOut) {
     const tIn = new Date(rec.timeIn);
     const tOut = new Date(rec.timeOut);
@@ -69,7 +101,6 @@ export async function setAttendanceForDate(
     rec.lateMinutes = late > 15 ? late : 0;
     rec.status = "present";
   } else if (rec.timeIn || rec.timeOut) {
-    // Partial data
     rec.status = rec.timeIn ? "present" : "pending";
   } else {
     rec.status = "absent";
@@ -81,6 +112,18 @@ export async function setAttendanceForDate(
 
 export async function logTimeIn(employeeId: string, now = new Date()): Promise<AttendanceRecord> {
   const date = now.toISOString().slice(0, 10);
+  // Try API first
+  try {
+    const res = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId, date, timeIn: now.toISOString() }),
+    });
+    if (res.ok) return (await res.json()) as AttendanceRecord;
+  } catch (e) {
+    console.debug('attendanceClient: API logTimeIn failed, falling back to localStorage', e);
+  }
+
   const records = readStore();
   const existing = records.find((r) => r.employeeId === employeeId && r.date === date);
   if (existing) {
@@ -110,6 +153,18 @@ export async function logTimeIn(employeeId: string, now = new Date()): Promise<A
 
 export async function logTimeOut(employeeId: string, now = new Date()): Promise<AttendanceRecord | null> {
   const date = now.toISOString().slice(0, 10);
+  // Try API first
+  try {
+    const res = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId, date, timeOut: now.toISOString() }),
+    });
+    if (res.ok) return (await res.json()) as AttendanceRecord;
+  } catch (e) {
+    console.debug('attendanceClient: API logTimeOut failed, falling back to localStorage', e);
+  }
+
   const records = readStore();
   const existing = records.find((r) => r.employeeId === employeeId && r.date === date);
   if (!existing) {

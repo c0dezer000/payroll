@@ -16,7 +16,6 @@ import {
   AlertCircle,
   Star,
 } from "lucide-react";
-import { employees as seedEmployees } from "../data/employees";
 import { type Employee } from "../types";
 import { formatCurrency, formatDate } from "../utils/payroll";
 
@@ -54,6 +53,23 @@ const emptyEmployee = (): Employee => ({
   // optional extras used in UI
   isManagement: false as any,
   religion: "" as any,
+  allowances: {
+    transport: 0,
+    meal: 0,
+    bonus: 0,
+    overtime: 0,
+    tips: 0,
+    holidayAllowance: 0,
+  },
+  deductions: {
+    tax: 0,
+    insurance: 0,
+    other: 0,
+    cooperativeFund: 0,
+    healthInsurance: 0,
+    loanDeduction: 0,
+    ppn: 0,
+  },
 });
 
 const EmployeeModal: React.FC<EmployeeModalProps> = ({
@@ -96,7 +112,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{title}</h2>
               {employee && (
                 <p className="text-slate-600 dark:text-slate-400 mt-1">
-                  {employee.id} • {employee.position}
+                  {(employee as any).employeeCode || employee.id} • {employee.position}
                 </p>
               )}
             </div>
@@ -129,22 +145,29 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Employee ID */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Employee ID *</label>
-                    {mode === "view" ? (
-                      <p className="text-slate-900 dark:text-white font-medium">{formData.id}</p>
-                    ) : (
-                      <input
-                        type="text"
-                        required
-                        value={formData.id}
-                        onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="Enter employee ID"
-                      />
-                    )}
-                  </div>
+                  {/* Employee ID - hidden when adding (UUID generated server-side) */}
+                  {mode !== "add" && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Employee ID *</label>
+                      {mode === "view" ? (
+                        <p className="text-slate-900 dark:text-white font-medium">{(formData as any).employeeCode || formData.id}</p>
+                      ) : (
+                        <input
+                          type="text"
+                          required
+                          value={formData.id}
+                          onChange={(e) => setFormData({ ...formData, id: e.target.value })}
+                          className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          placeholder="Enter employee ID"
+                        />
+                      )}
+                    </div>
+                  )}
+                  {mode === "add" && (
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      Employee ID will be generated automatically after creation.
+                    </div>
+                  )}
 
                   {/* Full Name */}
                   <div>
@@ -306,7 +329,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Join Date *</label>
                     {mode === "view" ? (
-                      <p className="text-slate-900 dark:text-white font-medium">{formatDate(formData.joinDate)}</p>
+                      <p className="text-slate-900 dark:text-white font-medium">{formData.joinDate ? formatDate(formData.joinDate) : ""}</p>
                     ) : (
                       <input
                         type="date"
@@ -528,9 +551,9 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
             <div>
               {mode === "view" && employee && (
                 <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
-                  <span>Employee ID: {employee.id}</span>
+                  <span>Employee ID: {(employee as any).employeeCode || employee.id}</span>
                   <span>•</span>
-                  <span>Joined: {formatDate(employee.joinDate)}</span>
+                  <span>Joined: {employee.joinDate ? formatDate(employee.joinDate) : ""}</span>
                 </div>
               )}
             </div>
@@ -589,7 +612,31 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
 };
 
 const EmployeeList: React.FC = () => {
-  const [employeeList, setEmployeeList] = useState<Employee[]>(seedEmployees as unknown as Employee[]);
+  const [employeeList, setEmployeeList] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/employees');
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || 'Failed to load employees');
+        }
+        const data = await res.json();
+        if (mounted) setEmployeeList(data as Employee[]);
+      } catch (err: any) {
+        console.error('Load employees error', err);
+        if (mounted) setLoadError(err.message || 'Failed to load employees');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
@@ -626,21 +673,95 @@ const EmployeeList: React.FC = () => {
   const handleCloseModal = () => setShowModal(false);
 
   const handleSaveEmployee = (emp: Employee) => {
-    setEmployeeList(prev => {
-      const idx = prev.findIndex(e => e.id === emp.id);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = emp;
-        return copy;
-      }
-      return [emp, ...prev];
-    });
-    setShowModal(false);
+    // If employee exists, update locally for now. If new (no id or empty id), create via API.
+    const exists = employeeList.some(e => e.id === emp.id && emp.id);
+  if (!exists) {
+      // Create on server
+      (async () => {
+        try {
+          const res = await fetch('/api/employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emp),
+          });
+          if (!res.ok) {
+            console.error('Failed to create employee', await res.text());
+            // Fallback to local add
+            setEmployeeList(prev => [emp, ...prev]);
+          } else {
+            const created = await res.json();
+            setEmployeeList(prev => [created as unknown as Employee, ...prev]);
+          }
+        } catch (err) {
+          console.error('Create employee error', err);
+          setEmployeeList(prev => [emp, ...prev]);
+        } finally {
+          setShowModal(false);
+        }
+      })();
+    } else {
+      // Update on server
+      (async () => {
+        try {
+          const res = await fetch('/api/employees', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emp),
+          });
+          if (!res.ok) {
+            console.error('Failed to update employee', await res.text());
+            // Fallback to local update
+            setEmployeeList(prev => {
+              const idx = prev.findIndex(e => e.id === emp.id);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = emp;
+                return copy;
+              }
+              return prev;
+            });
+          } else {
+            const updated = await res.json();
+            setEmployeeList(prev => {
+              const idx = prev.findIndex(e => e.id === updated.id);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = updated as unknown as Employee;
+                return copy;
+              }
+              return prev;
+            });
+          }
+        } catch (err) {
+          console.error('Update employee error', err);
+        } finally {
+          setShowModal(false);
+        }
+      })();
+    }
   };
 
   const handleDeleteEmployee = (employeeId: string) => {
-    setEmployeeList(prev => prev.filter(e => e.id !== employeeId));
-    setShowModal(false);
+    // Archive on server
+    (async () => {
+      try {
+        const res = await fetch(`/api/employees?id=${employeeId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          console.error('Failed to delete employee', await res.text());
+          // fallback: local remove
+          setEmployeeList(prev => prev.filter(e => e.id !== employeeId));
+        } else {
+          const result = await res.json();
+          // remove deleted employee from list
+          setEmployeeList(prev => prev.filter(e => e.id !== result.id));
+        }
+      } catch (err) {
+        console.error('Archive employee error', err);
+        setEmployeeList(prev => prev.filter(e => e.id !== employeeId));
+      } finally {
+        setShowModal(false);
+      }
+    })();
   };
 
   return (
@@ -719,7 +840,7 @@ const EmployeeList: React.FC = () => {
                     {employee.name}
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    {employee.id}
+                    {(employee as any).employeeCode || employee.id}
                   </p>
                 </div>
               </div>
@@ -764,7 +885,7 @@ const EmployeeList: React.FC = () => {
                 <Calendar className="h-4 w-4 text-slate-400 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {formatDate(employee.joinDate)}
+                    {employee.joinDate ? formatDate(employee.joinDate) : ""}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Join Date

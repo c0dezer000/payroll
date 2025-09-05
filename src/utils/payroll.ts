@@ -113,7 +113,7 @@ export const calculateHolidayAllowance = (
   const activeHoliday = getActiveHolidayForPeriod(period);
 
   if (!activeHoliday) {
-    return { amount: employee.allowances.holidayAllowance, type: null };
+    return { amount: (employee.allowances?.holidayAllowance as number) || 0, type: null };
   }
 
   // Check if employee's religion is eligible for this holiday
@@ -121,12 +121,12 @@ export const calculateHolidayAllowance = (
     employee.religion
   );
   if (!isEligibleByReligion) {
-    return { amount: employee.allowances.holidayAllowance, type: null };
+    return { amount: (employee.allowances?.holidayAllowance as number) || 0, type: null };
   }
 
   // Calculate holiday allowance based on multiplier
   const holidayAmount = employee.baseSalary * activeHoliday.allowanceMultiplier;
-  const totalAmount = employee.allowances.holidayAllowance + holidayAmount;
+  const totalAmount = ((employee.allowances?.holidayAllowance as number) || 0) + holidayAmount;
 
   return { amount: totalAmount, type: activeHoliday.type };
 };
@@ -160,7 +160,7 @@ export const calculatePayroll = (
     calculateHolidayAllowance(employee, period);
 
   // Calculate tips (hanya untuk non-manajerial: dive master, supir, diving instructor)
-  let tipsAmount = employee.allowances.tips;
+  let tipsAmount = (employee.allowances?.tips as number) || 0;
   if (!employee.isManagement) {
     const eligiblePositions = [
       "dive master",
@@ -181,9 +181,9 @@ export const calculatePayroll = (
 
   // Calculate total allowances
   const allowancesTotal =
-    employee.allowances.transport +
-    employee.allowances.meal +
-    employee.allowances.bonus +
+    ((employee.allowances?.transport as number) || 0) +
+    ((employee.allowances?.meal as number) || 0) +
+    ((employee.allowances?.bonus as number) || 0) +
     tipsAmount +
     holidayAllowanceAmount +
     overtimePay;
@@ -196,12 +196,12 @@ export const calculatePayroll = (
 
   // Calculate total deductions (including PPN)
   const deductionsTotal =
-    employee.deductions.tax +
-    employee.deductions.insurance +
-    employee.deductions.other +
-    employee.deductions.cooperativeFund +
-    employee.deductions.healthInsurance +
-    employee.deductions.loanDeduction +
+    ((employee.deductions?.tax as number) || 0) +
+    ((employee.deductions?.insurance as number) || 0) +
+    ((employee.deductions?.other as number) || 0) +
+    ((employee.deductions?.cooperativeFund as number) || 0) +
+    ((employee.deductions?.healthInsurance as number) || 0) +
+    ((employee.deductions?.loanDeduction as number) || 0) +
     ppnAmount;
 
   // Final calculations
@@ -215,21 +215,21 @@ export const calculatePayroll = (
     period,
     baseSalary: employee.baseSalary,
     allowances: {
-      transport: employee.allowances.transport,
-      meal: employee.allowances.meal,
-      bonus: employee.allowances.bonus,
+      transport: ((employee.allowances?.transport as number) || 0),
+      meal: ((employee.allowances?.meal as number) || 0),
+      bonus: ((employee.allowances?.bonus as number) || 0),
       overtime: overtimePay,
       tips: tipsAmount,
       holidayAllowance: holidayAllowanceAmount,
       total: allowancesTotal,
     },
     deductions: {
-      tax: employee.deductions.tax,
-      insurance: employee.deductions.insurance,
-      other: employee.deductions.other,
-      cooperativeFund: employee.deductions.cooperativeFund,
-      healthInsurance: employee.deductions.healthInsurance,
-      loanDeduction: employee.deductions.loanDeduction,
+      tax: ((employee.deductions?.tax as number) || 0),
+      insurance: ((employee.deductions?.insurance as number) || 0),
+      other: ((employee.deductions?.other as number) || 0),
+      cooperativeFund: ((employee.deductions?.cooperativeFund as number) || 0),
+      healthInsurance: ((employee.deductions?.healthInsurance as number) || 0),
+      loanDeduction: ((employee.deductions?.loanDeduction as number) || 0),
       ppn: ppnAmount,
       total: deductionsTotal,
     },

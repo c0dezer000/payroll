@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   Download,
@@ -10,7 +10,9 @@ import {
 import { type DashboardStats, type ReportData } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/payroll";
 import { generateReportPDF } from "../../utils/reportGenerator";
-import { employees } from "../../data/employees";
+import type { Employee } from "../../types";
+
+  
 
 interface ReportsModalProps {
   isOpen: boolean;
@@ -31,23 +33,39 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
       : now.getFullYear().toString();
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchEmployees = async () => {
+      try {
+        const res = await fetch('/api/employees');
+        if (!res.ok) throw new Error('Failed to fetch employees');
+        const data: Employee[] = await res.json();
+        if (mounted) setEmployees(data || []);
+      } catch (err) {
+        console.error(err);
+        if (mounted) setEmployees([]);
+      }
+    };
+    fetchEmployees();
+    return () => { mounted = false };
+  }, []);
 
   const generateReportData = (): ReportData => {
     // Calculate department breakdown
-    const departmentBreakdown = Object.entries(dashboardStats.departmentStats)
+  const departmentBreakdown = Object.entries(dashboardStats.departmentStats)
       .map(([department, employeeCount]) => {
-        const deptEmployees = employees.filter(
-          (emp) => emp.department === department
-        );
+    const deptEmployees = employees.filter((emp) => emp.department === department);
         const totalSalary = deptEmployees.reduce((sum, emp) => {
           const allowances =
-            emp.allowances.transport +
-            emp.allowances.meal +
-            emp.allowances.bonus;
+            (emp.allowances?.transport || 0) +
+            (emp.allowances?.meal || 0) +
+            (emp.allowances?.bonus || 0);
           const deductions =
-            emp.deductions.tax +
-            emp.deductions.insurance +
-            emp.deductions.other;
+            (emp.deductions?.tax || 0) +
+            (emp.deductions?.insurance || 0) +
+            (emp.deductions?.other || 0);
           return sum + (emp.baseSalary + allowances - deductions);
         }, 0);
 
@@ -69,16 +87,16 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
       { range: "> 25M", min: 25000000, max: Infinity },
     ];
 
-    const salaryDistribution = salaryRanges.map(({ range, min, max }) => {
-      const count = employees.filter((emp) => {
+  const salaryDistribution = salaryRanges.map(({ range, min, max }) => {
+  const count = employees.filter((emp) => {
         const netSalary =
           emp.baseSalary +
-          emp.allowances.transport +
-          emp.allowances.meal +
-          emp.allowances.bonus -
-          emp.deductions.tax -
-          emp.deductions.insurance -
-          emp.deductions.other;
+          (emp.allowances?.transport || 0) +
+          (emp.allowances?.meal || 0) +
+          (emp.allowances?.bonus || 0) -
+          (emp.deductions?.tax || 0) -
+          (emp.deductions?.insurance || 0) -
+          (emp.deductions?.other || 0);
         return netSalary >= min && netSalary < max;
       }).length;
 
@@ -90,19 +108,19 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
     });
 
     // Get top earners
-    const topEarners = employees
+  const topEarners = employees
       .map((emp) => ({
         name: emp.name,
         position: emp.position,
         department: emp.department,
         salary:
           emp.baseSalary +
-          emp.allowances.transport +
-          emp.allowances.meal +
-          emp.allowances.bonus -
-          emp.deductions.tax -
-          emp.deductions.insurance -
-          emp.deductions.other,
+          (emp.allowances?.transport || 0) +
+          (emp.allowances?.meal || 0) +
+          (emp.allowances?.bonus || 0) -
+          (emp.deductions?.tax || 0) -
+          (emp.deductions?.insurance || 0) -
+          (emp.deductions?.other || 0),
       }))
       .sort((a, b) => b.salary - a.salary)
       .slice(0, 10);
@@ -123,7 +141,7 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
         };
       });
 
-    return {
+  return {
       period: selectedPeriod,
       type: reportType,
       totalPayroll: dashboardStats.totalPayroll,

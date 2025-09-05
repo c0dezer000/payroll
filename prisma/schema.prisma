@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model attendance {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id       String    @db.Uuid
+  date              DateTime  @db.Date
+  time_in           DateTime? @db.Timestamptz(6)
+  time_out          DateTime? @db.Timestamptz(6)
+  hours_worked      Decimal?  @default(0) @db.Decimal(6, 2)
+  overtime_hours    Decimal?  @default(0) @db.Decimal(6, 2)
+  late_minutes      Int?      @default(0)
+  undertime_minutes Int?      @default(0)
+  status            String?
+  source            String?
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
+  employees         employees @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, date])
+  @@index([employee_id, date(sort: Desc)], map: "idx_attendance_employee_date")
+}
+
+model audit_logs {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor_id      String?  @db.Uuid
+  action        String
+  resource_type String?
+  resource_id   String?
+  meta          Json?
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model employees {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String
+  date_of_birth     DateTime?           @db.Date
+  marital_status    String?
+  email             String?             @unique
+  phone             String?
+  address           String?
+  position          String?
+  department        String?
+  join_date         DateTime?           @db.Date
+  employment_type   String?
+  base_salary       Decimal             @default(0) @db.Decimal(12, 2)
+  overtime_rate     Decimal             @default(0) @db.Decimal(12, 2)
+  payroll_frequency String?
+  bank_account      String?
+  status            String?             @default("active")
+  sss_number        String?
+  philhealth_number String?
+  pagibig_number    String?
+  tin               String?
+  tax_status        String?
+  is_management     Boolean?            @default(false)
+  religion          String?
+  holiday_settings  Json?
+  allowances        Json?
+  deductions        Json?
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  attendance        attendance[]
+  leaves            leaves[]
+  overtime_requests overtime_requests[]
+  payslips          payslips[]
+}
+
+
+model holidays {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String
+  date                 DateTime @db.Date
+  type                 String?
+  description          String?
+  allowance_multiplier Decimal? @default(0) @db.Decimal(7, 4)
+  eligible_religions   String[]
+  is_active            Boolean? @default(true)
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model leaves {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String    @db.Uuid
+  start_date  DateTime  @db.Date
+  end_date    DateTime  @db.Date
+  type        String?
+  reason      String?
+  status      String?   @default("pending")
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
+  employees   employees @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_leaves_employee")
+}
+
+model overtime_requests {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String    @db.Uuid
+  date        DateTime  @db.Date
+  hours       Decimal   @db.Decimal(6, 2)
+  reason      String?
+  status      String?   @default("pending")
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
+  employees   employees @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_overtime_employee")
+}
+
+model payroll_runs {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  period       String
+  initiator_id String?    @db.Uuid
+  status       String?    @default("pending")
+  summary      Json?
+  started_at   DateTime?  @db.Timestamptz(6)
+  completed_at DateTime?  @db.Timestamptz(6)
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  users        users?     @relation(fields: [initiator_id], references: [id], onUpdate: NoAction)
+  payslips     payslips[]
+
+  @@index([period], map: "idx_payroll_runs_period")
+}
+
+model payslips {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payroll_run_id String?       @db.Uuid
+  employee_id    String        @db.Uuid
+  base_salary    Decimal?      @db.Decimal(12, 2)
+  allowances     Json?
+  deductions     Json?
+  gross_salary   Decimal?      @db.Decimal(12, 2)
+  net_salary     Decimal?      @db.Decimal(12, 2)
+  overtime_hours Decimal?      @db.Decimal(6, 2)
+  holiday_type   String?
+  pdf_url        String?
+  generated_at   DateTime      @default(now()) @db.Timestamptz(6)
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+  employees      employees     @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payroll_runs   payroll_runs? @relation(fields: [payroll_run_id], references: [id], onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_payslips_employee")
+}
+
+model users {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  email         String         @unique
+  password_hash String?
+  role          String
+  avatar        String?
+  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime       @default(now()) @db.Timestamptz(6)
+  payroll_runs  payroll_runs[]
+}

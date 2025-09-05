@@ -1,6 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import { employees } from "../data/employees";
+import React, { useMemo, useState, useEffect } from "react";
 import AttendanceDashboardCard from "./AttendanceDashboardCard";
 import AttendanceHistory from "./AttendanceHistory";
 import * as attendanceClient from "./attendanceClient";
@@ -15,8 +14,33 @@ function toISO(date: string, time?: string): string | null {
 }
 
 const AttendancePage: React.FC = () => {
-  const empOptions = useMemo(() => employees.map((e) => ({ id: e.id, name: e.name })), []);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(empOptions[0]?.id ?? "");
+  const [empOptions, setEmpOptions] = useState<{ id: string; name: string }[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [employeesLoading, setEmployeesLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setEmployeesLoading(true);
+        const res = await fetch('/api/employees');
+        if (!res.ok) return;
+        const data = await res.json();
+        // Support paginated and non-paginated responses
+        const list = Array.isArray(data) ? data : (data.items || []);
+        const opts = list.map((e: any) => ({ id: e.id, name: e.name }));
+        if (!mounted) return;
+        setEmpOptions(opts);
+        if (!selectedEmployeeId && opts.length) setSelectedEmployeeId(opts[0].id);
+      } catch (err) {
+        console.error('Failed to load employees for attendance dropdown', err);
+      } finally {
+        if (mounted) setEmployeesLoading(false);
+      }
+    })();
+    return () => { mounted = false };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [timeIn, setTimeIn] = useState<string>("");
   const [timeOut, setTimeOut] = useState<string>("");
@@ -53,7 +77,7 @@ const AttendancePage: React.FC = () => {
                 >
                   {empOptions.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.name} ({e.id})
+                      {e.name}
                     </option>
                   ))}
                 </select>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   MessageSquare,
   Send,
@@ -8,7 +8,7 @@ import {
   AlertCircle,
   Phone,
 } from "lucide-react";
-import { employees } from "../data/employees";
+import type { Employee } from "../types";
 import {
   formatCurrency,
   getCurrentPeriod,
@@ -26,6 +26,27 @@ const WhatsAppIntegration: React.FC = () => {
   const [messageStatus, setMessageStatus] = useState<MessageStatus[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [selectedPeriod] = useState(getCurrentPeriod());
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchEmployees = async () => {
+      try {
+        const res = await fetch('/api/employees');
+        if (!res.ok) throw new Error('Failed to load employees');
+        const data: Employee[] = await res.json();
+        if (mounted) setEmployees(data || []);
+      } catch (err) {
+        console.error(err);
+        if (mounted) setEmployees([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchEmployees();
+    return () => { mounted = false };
+  }, []);
 
   const handleSelectAll = () => {
     if (selectedEmployees.length === employees.length) {
@@ -93,10 +114,10 @@ const WhatsAppIntegration: React.FC = () => {
 
       // Open WhatsApp for demonstration
       if (success) {
-        const whatsappUrl = `https://wa.me/${employee.phone.replace(
-          /\D/g,
-          ""
-        )}?text=${encodeURIComponent(message)}`;
+          const phone = employee.phone || "";
+          const whatsappUrl = `https://wa.me/${phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+            message
+          )}`;
         setTimeout(() => window.open(whatsappUrl, "_blank"), 500);
       }
     }

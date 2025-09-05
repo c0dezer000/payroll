@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
 	Calendar,
 	Play,
@@ -9,7 +8,8 @@ import {
 	Clock,
 	TrendingUp,
 } from "lucide-react";
-import { employees } from "../data/employees";
+import { useEffect, useState } from "react"; // Combined import
+import type { Employee } from "../types";
 import {
 	formatCurrency,
 	getCurrentPeriod,
@@ -28,6 +28,27 @@ const PayrollProcessing: React.FC = () => {
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [processingStatus, setProcessingStatus] = useState<ProcessingStatus[]>([]);
 	const [completedProcessing, setCompletedProcessing] = useState(false);
+	const [employees, setEmployees] = useState<Employee[]>([]);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		let mounted = true;
+		const fetchEmployees = async () => {
+			try {
+				const res = await fetch('/api/employees');
+				if (!res.ok) throw new Error('Failed to fetch employees');
+				const data = await res.json();
+				if (mounted) setEmployees(data || []);
+			} catch (err) {
+				console.error(err);
+				if (mounted) setEmployees([]);
+			} finally {
+				if (mounted) setLoading(false);
+			}
+		};
+		fetchEmployees();
+		return () => { mounted = false };
+	}, []);
 
 	const totalPayroll = employees.reduce((sum, emp) => {
 		const payslip = calculatePayroll(emp, selectedPeriod);
@@ -132,7 +153,7 @@ const PayrollProcessing: React.FC = () => {
 
 				{/* Summary Cards */}
 				<div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-					<div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-6 border border-slate-200 dark:border-slate-600">
+					<div className="bg-white dark:bg-slate-700 rounded-xl p-6 border border-slate-200 dark:border-slate-600">
 						<div className="flex items-center justify-between">
 							<div>
 								<p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-2">Total Employees</p>
@@ -142,7 +163,7 @@ const PayrollProcessing: React.FC = () => {
 						</div>
 					</div>
 
-					<div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-6 border border-emerald-200 dark:border-emerald-800">
+					<div className="bg-white dark:bg-emerald-900/20 rounded-xl p-6 border border-emerald-200 dark:border-emerald-800">
 						<div className="flex items-center justify-between">
 							<div>
 								<p className="text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-2">Total Payroll</p>
@@ -152,7 +173,7 @@ const PayrollProcessing: React.FC = () => {
 						</div>
 					</div>
 
-					<div className="bg-violet-50 dark:bg-violet-900/20 rounded-xl p-6 border border-violet-200 dark:border-violet-800">
+					<div className="bg-white dark:bg-violet-900/20 rounded-xl p-6 border border-violet-200 dark:border-violet-800">
 						<div className="flex items-center justify-between">
 							<div>
 								<p className="text-violet-600 dark:text-violet-400 text-sm font-medium mb-2">Progress</p>
@@ -166,7 +187,7 @@ const PayrollProcessing: React.FC = () => {
 						</div>
 					</div>
 
-					<div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-6 border border-amber-200 dark:border-amber-800">
+					<div className="bg-white dark:bg-amber-900/20 rounded-xl p-6 border border-amber-200 dark:border-amber-800">
 						<div className="flex items-center justify-between">
 							<div>
 								<p className="text-amber-600 dark:text-amber-400 text-sm font-medium mb-2">Avg. Salary</p>

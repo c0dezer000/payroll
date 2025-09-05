@@ -15,15 +15,21 @@ body {
   background: var(--background);
 }
 
-/* Theme text variables to provide accessible contrast across components */
+/* Theme text & surface variables to provide accessible contrast across components */
 :root {
   --text: #0f172a; /* slate-900 */
   --muted: #475569; /* slate-600 */
+  --surface: #ffffff; /* main card background (attendance card) */
+  --surface-border: #e6eef8; /* light border */
+  --surface-contrast: #f8fafc; /* subtle tile background used by attendance small cards */
 }
 
 html.dark {
   --text: #e6eef8; /* slate-200 */
   --muted: #94a3b8; /* slate-400 */
+  --surface: #0b1220; /* match dark background for uniform look */
+  --surface-border: #1f2937;
+  --surface-contrast: #1f2937; /* darker tile surface for small cards in dark mode */
 }
 
 /* Apply text color by default so elements without explicit text classes are readable */
@@ -58,26 +64,25 @@ html.dark .text-white {
 }
 
 /* Surface variables for cards/containers */
-:root {
-  --surface: #ffffff;
-  --surface-border: #e6eef8; /* light border */
-}
-
-html.dark {
-  --surface: #0b1220; /* match dark background for uniform look */
-  --surface-border: #1f2937;
-}
 
 /* Normalize common Tailwind background utilities to use surface variables
-   This forces card/container classes like `bg-white` or `dark:bg-slate-800`
-   to follow the theme's surface color without refactoring every component. */
-.bg-white, .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100, .bg-slate-50\/20, .bg-white\/20, .bg-white\/30, .bg-slate-100\/20 {
+   and keep attendance page light-mode look consistent across the app.
+   --surface is the main card background (attendance card). --surface-contrast
+   is a subtle, slightly different tile background used for small cards/tiles
+   like the boxes inside the attendance dashboard. */
+.bg-white {
   background-color: var(--surface) !important;
 }
 
-/* Dark-mode specific compiled utilities are represented as selectors under html.dark
-   so ensure they also map to the surface variable. */
-html.dark .bg-white,
+/* subtle tile backgrounds (attendance small cards, muted button backgrounds) */
+.bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100 {
+  background-color: var(--surface-contrast) !important;
+}
+
+/* Dark-mode mapping to keep consistent tile contrast */
+html.dark .bg-white {
+  background-color: var(--surface) !important;
+}
 html.dark .bg-slate-50,
 html.dark .bg-slate-100,
 html.dark .bg-slate-800,
@@ -85,7 +90,7 @@ html.dark .bg-slate-700,
 html.dark .bg-slate-900,
 html.dark .bg-gray-50,
 html.dark .bg-gray-100 {
-  background-color: var(--surface) !important;
+  background-color: var(--surface-contrast) !important;
 }
 
 /* Normalize border utilities used on cards */
@@ -95,6 +100,23 @@ html.dark .bg-gray-100 {
 html.dark .border-slate-200,
 html.dark .border-slate-700 {
   border-color: var(--surface-border) !important;
+}
+
+/* Map common text utility classes used in attendance page to theme tokens
+   so components using these utilities inherit the attendance palette in light mode */
+.text-slate-900 {
+  color: var(--text) !important;
+}
+.text-slate-600,
+.text-slate-500 {
+  color: var(--muted) !important;
+}
+html.dark .text-slate-900 {
+  color: var(--text) !important;
+}
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: var(--muted) !important;
 }
 
 /* Improve form and focus defaults slightly */

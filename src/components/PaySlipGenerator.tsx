@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Download,
   Send,
@@ -8,7 +8,7 @@ import {
   Clock,
   Gift,
 } from "lucide-react";
-import { employees } from "../data/employees";
+import type { Employee } from "../types";
 import {
   calculatePayroll,
   formatCurrency,
@@ -22,14 +22,74 @@ import { generatePDF } from "../utils/pdfGenerator";
 const PaySlipGenerator: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod());
-  const [overtimeHours, setOvertimeHours] = useState(0);
+  const [overtimeHours, setOvertimeHours] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchEmployees = async () => {
+      try {
+        const res = await fetch('/api/employees');
+        if (!res.ok) throw new Error('Failed to fetch employees');
+        const data = await res.json();
+        if (mounted) setEmployees(data || []);
+      } catch (err) {
+        console.error(err);
+        if (mounted) setEmployees([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchEmployees();
+    return () => { mounted = false };
+  }, []);
+
+  // (removed auto-clear of overtimeHours on employee change to preserve prefills)
 
   const employee = employees.find((emp) => emp.id === selectedEmployee);
   const payslip = employee
-    ? calculatePayroll(employee, selectedPeriod, overtimeHours)
+    ? calculatePayroll(employee, selectedPeriod, overtimeHours ?? 0)
     : null;
   const activeHoliday = getActiveHolidayForPeriod(selectedPeriod);
+
+  // When employee or period changes, fetch attendance for that month and prefill overtimeHours
+  useEffect(() => {
+    let mounted = true;
+    const fetchAttendanceOvertime = async () => {
+      if (!selectedEmployee || !selectedPeriod) return;
+
+      const [mStr, yStr] = selectedPeriod.split("/");
+      const monthNum = Number(mStr);
+      const yearNum = Number(yStr);
+      if (!monthNum || !yearNum) return;
+
+      const start = new Date(yearNum, monthNum - 1, 1);
+      const end = new Date(yearNum, monthNum, 0); // last day of month
+
+      try {
+        const res = await fetch(
+          `/api/attendance?employeeId=${encodeURIComponent(selectedEmployee)}&start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}`
+        );
+        if (!res.ok) throw new Error('Failed to fetch attendance');
+        const data = await res.json();
+        if (!mounted) return;
+
+        const totalOvertime = Array.isArray(data)
+          ? data.reduce((sum: number, rec: any) => sum + (Number(rec.overtimeHours) || 0), 0)
+          : 0;
+
+        // Only set if > 0 to avoid showing stray 0; otherwise keep null
+        setOvertimeHours(totalOvertime > 0 ? Math.round(totalOvertime * 100) / 100 : null);
+      } catch (err) {
+        console.error('Error fetching attendance overtime', err);
+      }
+    };
+
+    fetchAttendanceOvertime();
+    return () => { mounted = false };
+  }, [selectedEmployee, selectedPeriod]);
 
   const handleDownloadPDF = async () => {
     if (!payslip) return;
@@ -52,10 +112,10 @@ const PaySlipGenerator: React.FC = () => {
     },\n\nYour pay slip for ${selectedPeriod} is ready!\n\n💰 Net Salary: ${formatCurrency(
       payslip.netSalary
   )}\n\nThank you for your dedication to Bayani Solutions! �🇭`;
-    const whatsappUrl = `https://wa.me/${employee.phone.replace(
-      /\D/g,
-      ""
-    )}?text=${encodeURIComponent(message)}`;
+       const phone = employee.phone || "";
+       const whatsappUrl = `https://wa.me/${phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+         message
+       )}`;
     window.open(whatsappUrl, "_blank");
   };
 
@@ -74,16 +134,16 @@ const PaySlipGenerator: React.FC = () => {
 
       {/* Holiday Alert */}
       {activeHoliday && (
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
           <div className="flex items-center space-x-4">
-            <div className="bg-emerald-600 p-3 rounded-xl">
-              <Gift className="h-6 w-6 text-white" />
+            <div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+              <Gift className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-emerald-800 dark:text-emerald-400">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-emerald-400">
                 {activeHoliday.name}
               </h3>
-              <p className="text-emerald-700 dark:text-emerald-300 mt-1">
+              <p className="text-slate-500 dark:text-emerald-300 mt-1">
                 {activeHoliday.description} - Tunjangan otomatis akan
                 ditambahkan ({activeHoliday.allowanceMultiplier * 100}% dari
                 gaji pokok)
@@ -105,10 +165,10 @@ const PaySlipGenerator: React.FC = () => {
               onChange={(e) => setSelectedEmployee(e.target.value)}
               className="w-full px-4 py-4 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent text-base"
             >
-              <option value="">Choose an employee...</option>
+              <option value="" disabled={loading}>{loading ? "Loading employees..." : "Choose an employee..."}</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.name} - {emp.position}
+                  {emp.name}
                 </option>
               ))}
             </select>
@@ -144,15 +204,19 @@ const PaySlipGenerator: React.FC = () => {
                 type="number"
                 min="0"
                 max="100"
-                value={overtimeHours}
-                onChange={(e) =>
-                  setOvertimeHours(parseInt(e.target.value) || 0)
-                }
+                value={overtimeHours ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "") return setOvertimeHours(null);
+                  const n = parseInt(val, 10);
+                  if (Number.isNaN(n)) return setOvertimeHours(null);
+                  setOvertimeHours(Math.max(0, Math.min(100, n)));
+                }}
                 className="w-full pl-12 pr-4 py-4 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent text-base"
-                placeholder="0"
+                placeholder={""}
               />
             </div>
-            {employee?.overtimeRate && (
+            {employee && typeof employee.overtimeRate === "number" && employee.overtimeRate > 0 && (
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
                 Rate: {formatCurrency(employee.overtimeRate)}/hour
               </p>
@@ -166,28 +230,28 @@ const PaySlipGenerator: React.FC = () => {
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="p-10" id="payslip-content">
             {/* Header */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-700 text-white p-8 rounded-2xl mb-8">
+            <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl mb-8 shadow-lg border border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold mb-3">BAYANI SOLUTIONS</h1>
-                  <p className="text-slate-300 text-lg">
+                  <h1 className="text-3xl font-bold mb-3 text-slate-900 dark:text-white">BAYANI SOLUTIONS</h1>
+                  <p className="text-slate-500 dark:text-slate-400 text-lg">
                     Payroll & HR Solutions for Filipinos
                   </p>
                   <div className="flex items-center space-x-6 mt-4 text-sm">
                     <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>Ortigas Center, Pasig City, Metro Manila</span>
+                      <MapPin className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <span className="text-slate-900 dark:text-slate-200">Ortigas Center, Pasig City, Metro Manila</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Phone className="h-4 w-4" />
-                      <span>+63 2 8888 1234</span>
+                      <Phone className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <span className="text-slate-900 dark:text-slate-200">+63 2 8888 1234</span>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl">
-                    <FileText className="h-10 w-10 mb-3" />
-                    <p className="text-sm font-semibold">PAY SLIP</p>
+                  <div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0 text-center">
+                    <FileText className="h-8 w-8 lg:h-10 lg:w-10 text-slate-600 dark:text-slate-400 mb-2" />
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">PAY SLIP</p>
                   </div>
                 </div>
               </div>
@@ -195,14 +259,16 @@ const PaySlipGenerator: React.FC = () => {
 
             {/* Holiday Banner */}
             {payslip.holidayType && (
-              <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white p-6 rounded-xl mb-8">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-xl mb-8 shadow-lg border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center space-x-4">
-                  <Gift className="h-8 w-8" />
+                  <div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                    <Gift className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
+                  </div>
                   <div>
-                    <h3 className="text-xl font-bold">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-emerald-400">
                       {getHolidayName(payslip.holidayType)}
                     </h3>
-                    <p className="text-emerald-100">
+                    <p className="text-slate-500 dark:text-emerald-100">
                       Selamat hari raya! Tunjangan khusus telah ditambahkan.
                     </p>
                   </div>
@@ -222,7 +288,7 @@ const PaySlipGenerator: React.FC = () => {
                       Employee ID:
                     </span>
                     <span className="font-semibold text-slate-900 dark:text-white">
-                      {employee.id}
+                      {(employee as any).employeeCode || employee.id}
                     </span>
                   </div>
                   <div className="flex justify-between py-2">
@@ -281,7 +347,7 @@ const PaySlipGenerator: React.FC = () => {
                       {employee.bankAccount}
                     </span>
                   </div>
-                  {overtimeHours > 0 && (
+                  {overtimeHours !== null && overtimeHours > 0 && (
                     <div className="flex justify-between py-2">
                       <span className="text-slate-600 dark:text-slate-400 font-medium">
                         Overtime Hours:
@@ -303,8 +369,8 @@ const PaySlipGenerator: React.FC = () => {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Earnings */}
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                  <h4 className="font-bold text-emerald-800 dark:text-emerald-400 mb-6 text-lg">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-lg">
                     Earnings
                   </h4>
                   <div className="space-y-4">
@@ -372,12 +438,12 @@ const PaySlipGenerator: React.FC = () => {
                         </span>
                       </div>
                     )}
-                    <div className="border-t border-emerald-200 dark:border-emerald-800 pt-4 mt-4">
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
                       <div className="flex justify-between font-bold text-lg">
-                        <span className="text-emerald-800 dark:text-emerald-400">
+                        <span className="text-slate-900 dark:text-white">
                           Gross Salary
                         </span>
-                        <span className="text-emerald-800 dark:text-emerald-400">
+                        <span className="text-slate-900 dark:text-white">
                           {formatCurrency(payslip.grossSalary)}
                         </span>
                       </div>
@@ -386,8 +452,8 @@ const PaySlipGenerator: React.FC = () => {
                 </div>
 
                 {/* Deductions */}
-                <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-xl border border-red-200 dark:border-red-800">
-                  <h4 className="font-bold text-red-800 dark:text-red-400 mb-6 text-lg">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-lg">
                     Deductions
                   </h4>
                   <div className="space-y-4">
@@ -455,12 +521,12 @@ const PaySlipGenerator: React.FC = () => {
                         </span>
                       </div>
                     )}
-                    <div className="border-t border-red-200 dark:border-red-800 pt-4 mt-4">
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
                       <div className="flex justify-between font-bold text-lg">
-                        <span className="text-red-800 dark:text-red-400">
+                        <span className="text-slate-900 dark:text-white">
                           Total Deductions
                         </span>
-                        <span className="text-red-800 dark:text-red-400">
+                        <span className="text-slate-900 dark:text-white">
                           {formatCurrency(payslip.deductions.total)}
                         </span>
                       </div>
@@ -470,14 +536,14 @@ const PaySlipGenerator: React.FC = () => {
               </div>
 
               {/* Net Salary */}
-              <div className="mt-8 bg-gradient-to-r from-slate-900 to-slate-700 text-white p-8 rounded-2xl">
+              <div className="mt-8 bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-xl font-bold mb-2">Net Salary</h4>
-                    <p className="text-slate-300">Amount to be paid</p>
+                    <h4 className="text-xl font-bold mb-2 text-slate-900 dark:text-white">Net Salary</h4>
+                    <p className="text-slate-500 dark:text-slate-400">Amount to be paid</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-4xl font-bold">
+                    <p className="text-4xl font-bold text-slate-900 dark:text-white">
                       {formatCurrency(payslip.netSalary)}
                     </p>
                   </div>

@@ -71,7 +71,7 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
     pdf.setFont("helvetica", "normal");
 
     const employeeInfo = [
-      ["Employee ID:", payslip.employee.id],
+      ["Employee ID:", (payslip.employee as any).employeeCode || payslip.employee.id],
       ["Name:", payslip.employee.name],
       ["Position:", payslip.employee.position],
       ["Department:", payslip.employee.department],
@@ -80,9 +80,9 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
 
     employeeInfo.forEach(([label, value]) => {
       pdf.setTextColor(lightGray[0], lightGray[1], lightGray[2]);
-      pdf.text(label, 20, yPosition);
+      pdf.text(String(label || ""), 20, yPosition);
       pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      pdf.text(value, 70, yPosition);
+      pdf.text(String(value || ""), 70, yPosition);
       yPosition += 7;
     });
 
@@ -109,9 +109,9 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
 
     periodInfo.forEach(([label, value]) => {
       pdf.setTextColor(lightGray[0], lightGray[1], lightGray[2]);
-      pdf.text(label, pageWidth - 80, yPosition);
+      pdf.text(String(label || ""), pageWidth - 80, yPosition);
       pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      pdf.text(value, pageWidth - 30, yPosition);
+      pdf.text(String(value || ""), pageWidth - 30, yPosition);
       yPosition += 7;
     });
 
