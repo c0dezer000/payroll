@@ -1,21 +1,6 @@
 import jsPDF from "jspdf";
 import { type PaySlip } from "../types";
-
-// Local formatDate function (customize as needed)
-function formatDate(date: string | Date): string {
-  const d = new Date(date);
-  return d.toLocaleDateString("en-GB");
-}
-
-// Local formatCurrency function (customize as needed)
-function formatCurrency(amount: number): string {
-  return amount.toLocaleString("en-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-}
+import { formatCurrency, formatDate } from "./payroll";
 
 export const generatePDF = async (payslip: PaySlip): Promise<void> => {
   try {
@@ -39,16 +24,16 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
     pdf.setFontSize(12);
     pdf.text("~", 22, 23);
 
-    // Company name and details
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(24);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("ENJOY DIVE", 40, 20);
+  // Company name and details (Philippines)
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(24);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("BAYANI SOLUTIONS", 40, 20);
 
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Premier Diving Center in Bali", 40, 27);
-    pdf.text("Sanur Beach, Bali, Indonesia | +62 361 288 829", 40, 33);
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica", "normal");
+  pdf.text("Payroll & HR Solutions for Filipinos", 40, 27);
+  pdf.text("Ortigas Center, Pasig City, Metro Manila | +63 2 8888 1234", 40, 33);
 
     // Pay slip title
     pdf.setFillColor(255, 255, 255);
@@ -152,16 +137,10 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
       ]);
     }
     if (payslip.allowances.tips > 0) {
-      earnings.push([
-        "Tips dari Tamu",
-        formatCurrency(payslip.allowances.tips),
-      ]);
+      earnings.push(["Tips", formatCurrency(payslip.allowances.tips)]);
     }
     if (payslip.allowances.holidayAllowance > 0) {
-      earnings.push([
-        "Tunjangan Hari Raya",
-        formatCurrency(payslip.allowances.holidayAllowance),
-      ]);
+      earnings.push(["Holiday Allowance", formatCurrency(payslip.allowances.holidayAllowance)]);
     }
 
     earnings.forEach(([label, amount]) => {
@@ -208,22 +187,13 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
     ];
 
     if (payslip.deductions.cooperativeFund > 0) {
-      deductions.push([
-        "Dana Koperasi",
-        formatCurrency(payslip.deductions.cooperativeFund),
-      ]);
+      deductions.push(["Cooperative Fund", formatCurrency(payslip.deductions.cooperativeFund)]);
     }
     if (payslip.deductions.healthInsurance > 0) {
-      deductions.push([
-        "Asuransi Kesehatan",
-        formatCurrency(payslip.deductions.healthInsurance),
-      ]);
+      deductions.push(["Health Insurance", formatCurrency(payslip.deductions.healthInsurance)]);
     }
     if (payslip.deductions.loanDeduction > 0) {
-      deductions.push([
-        "Potongan Kasbon",
-        formatCurrency(payslip.deductions.loanDeduction),
-      ]);
+      deductions.push(["Loan Deduction", formatCurrency(payslip.deductions.loanDeduction)]);
     }
 
   // Government mandatory deductions for Philippines - always show rows
@@ -288,19 +258,14 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
       { align: "center" }
     );
     pdf.text(
-      "For queries, contact HR at hr@enjoydive.com",
+      "For queries, contact HR at hr@bayanisolutions.com",
       pageWidth / 2,
       yPosition + 5,
       { align: "center" }
     );
 
     // Save the PDF
-    pdf.save(
-      `payslip-${payslip.employee.name.replace(
-        /\s+/g,
-        "-"
-      )}-${payslip.period.replace("/", "-")}.pdf`
-    );
+    pdf.save(`payslip-${payslip.employee.name.replace(/\s+/g, "-")}-${payslip.period.replace("/", "-")}.pdf`);
   } catch (error) {
     console.error("Error generating PDF:", error);
     throw error;

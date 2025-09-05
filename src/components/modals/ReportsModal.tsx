@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   X,
   Download,
@@ -7,6 +7,7 @@ import {
   Users,
   DollarSign,
 } from "lucide-react";
+// ...existing imports
 import { type DashboardStats, type ReportData } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/payroll";
 import { generateReportPDF } from "../../utils/reportGenerator";
@@ -34,25 +35,46 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    let mounted = true;
-    const fetchEmployees = async () => {
-      try {
-        const res = await fetch('/api/employees');
-        if (!res.ok) throw new Error('Failed to fetch employees');
-        const data: Employee[] = await res.json();
-        if (mounted) setEmployees(data || []);
-      } catch (err) {
-        console.error(err);
-        if (mounted) setEmployees([]);
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const res = await fetch("/api/employees");
+      if (!res.ok) {
+        // try to parse server error message
+        let msg = res.statusText || `Status ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body && body.error) msg = String(body.error);
+        } catch (_) {
+          // ignore JSON parse errors
+        }
+        setFetchError(`Failed to fetch employees: ${msg}`);
+        if (mountedRef.current) setEmployees([]);
+        return;
       }
-    };
-    fetchEmployees();
-    return () => { mounted = false };
+
+      const data: Employee[] = await res.json();
+      setFetchError(null);
+      if (mountedRef.current) setEmployees(data || []);
+    } catch (err) {
+      console.error("fetchEmployees error:", err);
+      setFetchError("Network error while fetching employees");
+      if (mountedRef.current) setEmployees([]);
+    }
   }, []);
 
-  const generateReportData = (): ReportData => {
+  useEffect(() => {
+    mountedRef.current = true;
+    fetchEmployees();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [fetchEmployees]);
+
+  const generateReportData = (): any => {
+    const period = selectedPeriod;
     // Calculate department breakdown
   const departmentBreakdown = Object.entries(dashboardStats.departmentStats)
       .map(([department, employeeCount]) => {
@@ -107,20 +129,49 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
       };
     });
 
-    // Get top earners
-  const topEarners = employees
+    // Build per-employee computed rows (net pay primary)
+  const rows = employees.map((emp) => {
+    const allowancesTotal =
+      (emp.allowances?.transport || 0) +
+      (emp.allowances?.meal || 0) +
+      (emp.allowances?.bonus || 0) +
+      (emp.allowances?.overtime || 0) +
+      (emp.allowances?.tips || 0) +
+      (emp.allowances?.holidayAllowance || 0);
+
+    const deductionsTotal =
+      (emp.deductions?.tax || 0) +
+      (emp.deductions?.insurance || 0) +
+      (emp.deductions?.other || 0) +
+      (emp.deductions?.cooperativeFund || 0) +
+      (emp.deductions?.healthInsurance || 0) +
+      (emp.deductions?.loanDeduction || 0) +
+      (emp.deductions?.ppn || 0);
+
+    const gross = emp.baseSalary + allowancesTotal;
+    const net = gross - deductionsTotal;
+
+    return {
+      id: emp.id,
+      name: emp.name,
+      department: emp.department || "-",
+      position: emp.position || "-",
+      baseSalary: emp.baseSalary || 0,
+      allowancesTotal,
+      deductionsTotal,
+      gross,
+      net,
+      raw: emp,
+    };
+  });
+
+  // Get top earners (by net pay)
+  const topEarners = rows
       .map((emp) => ({
         name: emp.name,
         position: emp.position,
         department: emp.department,
-        salary:
-          emp.baseSalary +
-          (emp.allowances?.transport || 0) +
-          (emp.allowances?.meal || 0) +
-          (emp.allowances?.bonus || 0) -
-          (emp.deductions?.tax || 0) -
-          (emp.deductions?.insurance || 0) -
-          (emp.deductions?.other || 0),
+        salary: emp.net,
       }))
       .sort((a, b) => b.salary - a.salary)
       .slice(0, 10);
@@ -142,14 +193,15 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
       });
 
   return {
-      period: selectedPeriod,
+      period: period,
       type: reportType,
       totalPayroll: dashboardStats.totalPayroll,
       totalEmployees: dashboardStats.totalEmployees,
       departmentBreakdown,
       salaryDistribution,
       trends,
-      topEarners,
+  topEarners,
+  rows,
       generatedAt: new Date().toISOString(),
     };
   };
@@ -166,7 +218,7 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
     }
   };
 
-  const reportData = generateReportData();
+  const reportData: any = generateReportData();
 
   if (!isOpen) return null;
 
@@ -191,9 +243,9 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
           </button>
         </div>
 
-        <div className="flex flex-col xl:flex-row h-full">
+  <div className="flex flex-col xl:flex-row flex-1 min-h-0 overflow-hidden">
           {/* Controls Sidebar */}
-          <div className="xl:w-80 p-8 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+          <div className="xl:w-80 p-8 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 overflow-y-auto min-h-0">
             <div className="space-y-8">
               <div>
                 <label className="block text-base font-semibold text-slate-700 dark:text-slate-300 mb-4">
@@ -272,8 +324,23 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
           </div>
 
           {/* Report Preview */}
-          <div className="flex-1 p-8 overflow-y-auto">
+          <div className="flex-1 p-8 overflow-y-auto min-h-0 max-h-[70vh]">
             <div className="space-y-8">
+              {fetchError && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-amber-800 dark:text-amber-300">{fetchError}</div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => fetchEmployees()}
+                        className="px-3 py-1 bg-amber-600 text-white rounded-lg text-sm"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Report Header */}
               <div className="text-center pb-8 border-b border-slate-200 dark:border-slate-700">
                 <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">
@@ -359,7 +426,7 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {reportData.departmentBreakdown.map((dept) => (
+                      {reportData.departmentBreakdown.map((dept: any) => (
                         <tr
                           key={dept.department}
                           className="border-b border-slate-100 dark:border-slate-800"
@@ -389,7 +456,7 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
                   Top 10 Earners
                 </h4>
                 <div className="space-y-3">
-                  {reportData.topEarners.slice(0, 5).map((employee, index) => (
+                  {reportData.topEarners.slice(0, 5).map((employee: any, index: number) => (
                     <div
                       key={employee.name}
                       className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600"

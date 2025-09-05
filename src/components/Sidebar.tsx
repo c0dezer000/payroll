@@ -9,6 +9,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useEffect, useState } from "react";
 
 interface SidebarProps {
   activeTab: string;
@@ -17,6 +18,33 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   const { user } = useAuth();
+
+  // Company info shown in sidebar header. Keep in sync with Settings which persists to localStorage
+  const [company, setCompany] = useState<{ name: string; tagline?: string }>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("companySettings");
+        if (raw) return JSON.parse(raw);
+      }
+    } catch (err) {
+      // ignore
+    }
+    return { name: "Enjoy Dive", tagline: "Payroll System" };
+  });
+
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const raw = localStorage.getItem("companySettings");
+        if (raw) setCompany(JSON.parse(raw));
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    window.addEventListener("companySettingsChanged", handler);
+    return () => window.removeEventListener("companySettingsChanged", handler);
+  }, []);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -37,10 +65,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-lg lg:text-xl font-bold text-slate-900 dark:text-white truncate">
-              Enjoy Dive
+              {company?.name || "Enjoy Dive"}
             </h1>
             <p className="text-xs lg:text-sm text-slate-500 dark:text-slate-400 truncate">
-              Payroll System
+              {company?.tagline || "Payroll System"}
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import type { AttendanceRecord, LeaveRequest, OvertimeRequest } from "./types";
+import { getCachedHolidaysForYear } from "../utils/holidays";
 
 const STORAGE_KEY = "attendance.records.v1";
 
@@ -71,7 +72,7 @@ export async function setAttendanceForDate(
   const records = readStore();
   let rec = records.find((r) => r.employeeId === employeeId && r.date === date);
   if (!rec) {
-    rec = {
+    const newRec: AttendanceRecord = {
       id: `ATT-${employeeId}-${date}`,
       employeeId,
       date,
@@ -82,26 +83,43 @@ export async function setAttendanceForDate(
       lateMinutes: 0,
       undertimeMinutes: 0,
       status: "absent",
+      workedOnHoliday: false,
     };
-    records.push(rec);
+    records.push(newRec);
+    rec = newRec;
   }
 
   if (typeof opts.timeInISO !== "undefined") rec.timeIn = opts.timeInISO;
   if (typeof opts.timeOutISO !== "undefined") rec.timeOut = opts.timeOutISO;
 
   // Recompute derived fields (same logic as server)
-  if (rec.timeIn && rec.timeOut) {
+    if (rec.timeIn && rec.timeOut) {
     const tIn = new Date(rec.timeIn);
     const tOut = new Date(rec.timeOut);
     const hours = Math.max(0, (tOut.getTime() - tIn.getTime()) / 3600_000);
-    rec.hoursWorked = Math.round(hours * 100) / 100;
-    rec.overtimeHours = rec.hoursWorked > 8 ? Math.round((rec.hoursWorked - 8) * 100) / 100 : 0;
+  rec.hoursWorked = Math.round(hours * 100) / 100;
+  rec.overtimeHours = rec.hoursWorked > 8 ? Math.round((rec.hoursWorked - 8) * 100) / 100 : 0;
     const scheduledStart = new Date(rec.date + "T09:00:00");
     const late = Math.max(0, Math.round((tIn.getTime() - scheduledStart.getTime()) / 60000));
     rec.lateMinutes = late > 15 ? late : 0;
     rec.status = "present";
+      // mark if this date is an active holiday
+      try {
+        const y = new Date(rec.date).getFullYear();
+        const cached = getCachedHolidaysForYear(y) || [];
+        rec.workedOnHoliday = cached.some((h) => h.date === rec.date && h.isActive);
+      } catch (err) {
+        rec.workedOnHoliday = false;
+      }
   } else if (rec.timeIn || rec.timeOut) {
-    rec.status = rec.timeIn ? "present" : "pending";
+      rec.status = rec.timeIn ? "present" : "pending";
+      try {
+        const y = new Date(rec.date).getFullYear();
+        const cached = getCachedHolidaysForYear(y) || [];
+        rec.workedOnHoliday = cached.some((h) => h.date === rec.date && h.isActive) && !!rec.timeIn;
+      } catch (err) {
+        // ignore
+      }
   } else {
     rec.status = "absent";
   }
@@ -130,6 +148,13 @@ export async function logTimeIn(employeeId: string, now = new Date()): Promise<A
     if (existing.timeIn) return existing;
     existing.timeIn = now.toISOString();
     existing.status = "present";
+    try {
+      const y = new Date(existing.date).getFullYear();
+      const cached = getCachedHolidaysForYear(y) || [];
+      existing.workedOnHoliday = cached.some((h) => h.date === existing.date && h.isActive);
+    } catch (err) {
+      existing.workedOnHoliday = false;
+    }
     writeStore(records);
     return existing;
   }
@@ -145,6 +170,7 @@ export async function logTimeIn(employeeId: string, now = new Date()): Promise<A
     lateMinutes: 0,
     undertimeMinutes: 0,
     status: "present",
+    workedOnHoliday: false,
   };
   records.push(rec);
   writeStore(records);
@@ -179,6 +205,7 @@ export async function logTimeOut(employeeId: string, now = new Date()): Promise<
       lateMinutes: 0,
       undertimeMinutes: 0,
       status: "pending",
+      workedOnHoliday: false,
     };
     records.push(rec);
     writeStore(records);
@@ -200,6 +227,13 @@ export async function logTimeOut(employeeId: string, now = new Date()): Promise<
       existing.lateMinutes = late > 15 ? late : 0;
     }
     existing.status = "present";
+    try {
+      const y = new Date(existing.date).getFullYear();
+      const cached = getCachedHolidaysForYear(y) || [];
+      existing.workedOnHoliday = cached.some((h) => h.date === existing.date && h.isActive);
+    } catch (err) {
+      existing.workedOnHoliday = false;
+    }
   } else {
     existing.status = "pending";
   }

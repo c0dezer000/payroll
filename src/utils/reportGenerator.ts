@@ -31,13 +31,13 @@ export const generateReportPDF = async (
 
     // Company name and report title
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(28);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("ENJOY DIVE", 45, 25);
+  pdf.setFontSize(28);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("BAYANI SOLUTIONS", 45, 25);
 
-    pdf.setFontSize(12);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Premier Diving Center in Bali", 45, 32);
+  pdf.setFontSize(12);
+  pdf.setFont("helvetica", "normal");
+  pdf.text("Payroll & HR Solutions for Filipinos", 45, 32);
 
     // Report title
     pdf.setFontSize(18);
@@ -84,9 +84,7 @@ export const generateReportPDF = async (
       },
       {
         label: "Average Salary",
-        value: formatCurrency(
-          Math.round(reportData.totalPayroll / reportData.totalEmployees)
-        ),
+        value: formatCurrency(Math.round(reportData.totalPayroll / reportData.totalEmployees)),
         color: [168, 85, 247],
       },
     ];
@@ -267,7 +265,7 @@ export const generateReportPDF = async (
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "normal");
     pdf.text(
-      "This report is confidential and generated automatically by Enjoy Dive Payroll System",
+      "This report is confidential and generated automatically by Bayani Solutions Payroll System",
       pageWidth / 2,
       footerY,
       { align: "center" }

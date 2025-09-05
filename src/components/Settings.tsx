@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings as SettingsIcon,
   Users,
@@ -25,6 +25,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { holidayCalendar, formatDate } from "../utils/payroll";
+import { ensureHolidaysHydrated, getCachedHolidaysForYear } from "../utils/holidays";
 
 interface UserRole {
   id: string;
@@ -35,6 +36,7 @@ interface UserRole {
   status: "active" | "inactive";
   lastLogin: string;
   createdAt: string;
+  password?: string;
 }
 
 interface CompanySettings {
@@ -44,6 +46,7 @@ interface CompanySettings {
   email: string;
   website: string;
   taxId: string;
+  tagline?: string;
   logo: string;
 }
 
@@ -52,25 +55,43 @@ const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [activeSection, setActiveSection] = useState("general");
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [isEditingUser, setIsEditingUser] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // General settings state
+  const [systemLanguage, setSystemLanguage] = useState<string>("en");
+  const [currency, setCurrency] = useState<string>("PHP");
+  const [dateFormat, setDateFormat] = useState<string>("DD/MM/YYYY");
+  const [timezone, setTimezone] = useState<string>("Asia/Manila");
 
   // Company Settings State
   const [companySettings, setCompanySettings] = useState<CompanySettings>({
-    name: "Enjoy Dive",
-    address: "Sanur Beach, Bali, Indonesia",
-    phone: "+62 361 288 829",
-    email: "info@enjoydive.com",
-    website: "www.enjoydive.com",
-    taxId: "NPWP.123.456.789.0-123.000",
-    logo: "",
+  name: "Bayani Solutions",
+  address: "Ortigas Center, Pasig City, Metro Manila",
+  phone: "+63 2 8888 1234",
+  email: "info@bayanisolutions.com",
+  website: "www.bayanisolutions.com",
+  taxId: "TIN.123-456-789",
+  tagline: "Payroll & HR Solutions for Filipinos",
+  logo: "",
   });
+
+  // Which language to display holidays in (immediate UI control). Defaults to systemLanguage.
+  const [displayLanguage, setDisplayLanguage] = useState<string>(systemLanguage);
+
+  // Keep displayLanguage in sync when user changes the System Language select
+  // but allow the holiday UI control to override it independently.
+  useEffect(() => {
+    setDisplayLanguage(systemLanguage);
+  }, [systemLanguage]);
 
   // User Management State
   const [users, setUsers] = useState<UserRole[]>([
     {
       id: "1",
       name: "Made Sutrisno",
-      email: "owner@enjoydive.com",
+      email: "owner@bayanisolutions.com",
       role: "Owner",
       permissions: ["all"],
       status: "active",
@@ -80,7 +101,7 @@ const Settings: React.FC = () => {
     {
       id: "2",
       name: "Kadek Sari Dewi",
-      email: "admin@enjoydive.com",
+      email: "admin@bayanisolutions.com",
       role: "Admin",
       permissions: ["payroll", "employees", "reports"],
       status: "active",
@@ -90,7 +111,7 @@ const Settings: React.FC = () => {
     {
       id: "3",
       name: "Wayan Agus Pratama",
-      email: "hr@enjoydive.com",
+      email: "hr@bayanisolutions.com",
       role: "HR Manager",
       permissions: ["employees", "reports"],
       status: "active",
@@ -98,6 +119,41 @@ const Settings: React.FC = () => {
       createdAt: "2021-06-15T00:00:00Z",
     },
   ]);
+
+  // Hydrate users from localStorage if present (simple persistence for demo)
+  useEffect(() => {
+    let cancelled = false;
+    // Try to load users from the server first so we use the DB-backed list
+    (async () => {
+      try {
+        const res = await fetch(`/api/users`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && Array.isArray(data)) {
+            setUsers(data);
+            try { if (typeof window !== 'undefined') localStorage.setItem('appUsers', JSON.stringify(data)); } catch (e) { /* ignore */ }
+            return;
+          }
+        }
+      } catch (e) {
+        // server failed, continue to localStorage fallback
+        console.warn('Failed to load users from server, falling back to localStorage', e);
+      }
+
+      try {
+        if (typeof window !== "undefined") {
+          const raw = localStorage.getItem("appUsers");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) setUsers(parsed);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load users from localStorage", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const [newUser, setNewUser] = useState({
     name: "",
@@ -117,6 +173,17 @@ const Settings: React.FC = () => {
     monthlyReports: true,
   });
 
+  // Holiday list shown in the Holiday Calendar section. Start with any cached year
+  const [holidayList, setHolidayList] = useState(() => {
+    try {
+      // Attempt to read cached holidays for current year, fall back to built-in defaults
+      const cached = typeof window !== "undefined" ? getCachedHolidaysForYear() : [];
+      return (cached && cached.length > 0) ? cached : holidayCalendar;
+    } catch (err) {
+      return holidayCalendar;
+    }
+  });
+
   const availablePermissions = [
     { id: "dashboard", label: "Dashboard Access" },
     { id: "employees", label: "Employee Management" },
@@ -129,12 +196,55 @@ const Settings: React.FC = () => {
   ];
 
   const handleSaveCompanySettings = () => {
-    // In a real app, this would save to backend
-    alert("Company settings saved successfully!");
+    try {
+      // Persist company settings locally so other parts of the app can read them
+      if (typeof window !== "undefined") {
+        localStorage.setItem("companySettings", JSON.stringify(companySettings));
+        // notify other parts of the app
+        window.dispatchEvent(new Event("companySettingsChanged"));
+      }
+      // In a real app, this would also save to backend
+      alert("Company settings saved successfully!");
+    } catch (err) {
+      console.error("Failed to save company settings", err);
+      alert("Failed to save company settings");
+    }
   };
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isEditingUser && editingUserId) {
+      // Update existing user
+      const updatedUsers = users.map((u) =>
+        u.id === editingUserId
+          ? {
+              ...u,
+              name: newUser.name,
+              email: newUser.email,
+              role: newUser.role,
+              permissions: newUser.permissions,
+              password: newUser.password ? newUser.password : u.password,
+            }
+          : u
+      );
+      setUsers(updatedUsers);
+      // Try server update first, fall back to localStorage for offline/demo
+      try {
+        const res = await fetch(`/api/users`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingUserId, name: newUser.name, email: newUser.email, password: newUser.password, role: newUser.role }) });
+        if (!res.ok) throw new Error("Server returned error");
+        const payload = await res.json();
+        setUsers(updatedUsers);
+      } catch (err) {
+        console.warn("Server update failed, falling back to localStorage", err);
+        try { if (typeof window !== "undefined") localStorage.setItem("appUsers", JSON.stringify(updatedUsers)); } catch (e) { console.error("Failed to persist users to localStorage", e); }
+        setUsers(updatedUsers);
+      }
+      setIsEditingUser(false);
+      setEditingUserId(null);
+      setShowAddUserModal(false);
+      setNewUser({ name: "", email: "", role: "Admin", permissions: [], password: "" });
+      return;
+    }
 
     const user: UserRole = {
       id: (users.length + 1).toString(),
@@ -145,44 +255,110 @@ const Settings: React.FC = () => {
       status: "active",
       lastLogin: "Never",
       createdAt: new Date().toISOString(),
+  password: newUser.password || undefined,
     };
 
-    setUsers([...users, user]);
-    setShowAddUserModal(false);
-    setNewUser({
-      name: "",
-      email: "",
-      role: "Admin",
-      permissions: [],
-      password: "",
-    });
-  };
-
-  const handleDeleteUser = (userId: string) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
-      setUsers(users.filter((u) => u.id !== userId));
+    const newUsers = [...users, user];
+    // Try server create first; fallback to localStorage
+    try {
+      const res = await fetch(`/api/users`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: user.name, email: user.email, password: newUser.password, role: user.role }) });
+      if (!res.ok) throw new Error("Server returned error");
+      const payload = await res.json();
+      // If created on server, replace temporary id with server id
+      if (payload && payload.user && payload.user.id) {
+        const serverUser = { ...user, id: payload.user.id };
+        const finalUsers = [...users, serverUser];
+        setUsers(finalUsers);
+        if (typeof window !== "undefined") localStorage.setItem("appUsers", JSON.stringify(finalUsers));
+      } else {
+        setUsers(newUsers);
+        if (typeof window !== "undefined") localStorage.setItem("appUsers", JSON.stringify(newUsers));
+      }
+    } catch (err) {
+      console.warn("Server create failed, falling back to localStorage", err);
+      setUsers(newUsers);
+      try { if (typeof window !== "undefined") localStorage.setItem("appUsers", JSON.stringify(newUsers)); } catch (e) { console.error("Failed to persist users to localStorage", e); }
     }
+    setShowAddUserModal(false);
+    setNewUser({ name: "", email: "", role: "Admin", permissions: [], password: "" });
   };
 
-  const handleToggleUserStatus = (userId: string) => {
-    setUsers(
-      users.map((u) =>
-        u.id === userId
-          ? { ...u, status: u.status === "active" ? "inactive" : "active" }
-          : u
-      )
-    );
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    // Try server delete first
+    try {
+      const res = await fetch(`/api/users?id=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setUsers((prev) => {
+          const newList = prev.filter((u) => u.id !== userId);
+          try { if (typeof window !== 'undefined') localStorage.setItem('appUsers', JSON.stringify(newList)); } catch (e) { /* ignore */ }
+          return newList;
+        });
+        return;
+      }
+      console.warn('Server returned non-ok deleting user, falling back to local update');
+    } catch (err) {
+      console.warn('Server delete failed, falling back to local update', err);
+    }
+
+    // Fallback: update local state / localStorage
+    const newUsers = users.filter((u) => u.id !== userId);
+    setUsers(newUsers);
+    try { if (typeof window !== 'undefined') localStorage.setItem('appUsers', JSON.stringify(newUsers)); } catch (e) { console.error('Failed to persist users to localStorage', e); }
+  };
+
+  const handleToggleUserStatus = async (userId: string) => {
+    const updated: UserRole[] = users.map((u) =>
+      u.id === userId
+        ? { ...u, status: (u.status === 'active' ? 'inactive' : 'active') as UserRole['status'] }
+        : u
+    ) as UserRole[];
+    // Try to persist to server
+    try {
+      const target = updated.find((u) => u.id === userId);
+      if (target) {
+        const res = await fetch(`/api/users`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userId, status: target.status }) });
+        if (res.ok) {
+            setUsers(updated);
+            try { if (typeof window !== 'undefined') localStorage.setItem('appUsers', JSON.stringify(updated)); } catch (e) { /* ignore */ }
+            return;
+          }
+      }
+    } catch (err) {
+      console.warn('Server status toggle failed, falling back to local update', err);
+    }
+
+  // Fallback local update
+  setUsers(updated as UserRole[]);
+  try { if (typeof window !== 'undefined') localStorage.setItem('appUsers', JSON.stringify(updated)); } catch (e) { console.error('Failed to persist users to localStorage', e); }
   };
 
   const formatDateLocal = (dateString: string) => {
     if (dateString === "Never") return "Never";
-    return new Date(dateString).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("appSettings") : null;
+      const parsed = raw ? JSON.parse(raw) : {};
+      const locale = parsed.language || "fil-PH";
+      // choose month format based on dateFormat preference
+      const df = parsed.dateFormat || "DD/MM/YYYY";
+      const monthOption: Intl.DateTimeFormatOptions['month'] = df === 'MM/DD/YYYY' ? 'short' : 'long';
+
+      return new Date(dateString).toLocaleString(locale, {
+        day: "numeric",
+        month: monthOption,
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (err) {
+      return new Date(dateString).toLocaleString("fil-PH", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
   };
 
   const menuItems = [
@@ -252,7 +428,35 @@ const Settings: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {holidayCalendar.map((holiday) => (
+                  <div className="flex items-center justify-end mb-4 space-x-4">
+                    <div className="flex items-center space-x-2 text-sm">
+                      <label className="text-slate-700 dark:text-slate-300">Display:</label>
+                      <select value={displayLanguage} onChange={(e) => setDisplayLanguage(e.target.value)} className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                        <option value="en">English</option>
+                        <option value="local">Local</option>
+                      </select>
+                    </div>
+
+                    <div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const fetched = await ensureHolidaysHydrated();
+                          if (fetched && fetched.length > 0) setHolidayList(fetched);
+                          else alert("Could not load Philippine holidays. Using defaults.");
+                        } catch (err) {
+                          console.error("Failed to load PH holidays", err);
+                          alert("Failed to load Philippine holidays. Check console for details.");
+                        }
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2"
+                    >
+                      <span>Load Philippine Holidays</span>
+                    </button>
+                    </div>
+                  </div>
+
+                  {holidayList.map((holiday) => (
                     <div
                       key={holiday.id}
                       className="bg-slate-50 dark:bg-slate-700 rounded-xl p-6 border border-slate-200 dark:border-slate-600"
@@ -261,34 +465,38 @@ const Settings: React.FC = () => {
                         <div className="flex items-start space-x-4">
                           <div
                             className={`p-3 rounded-xl ${
-                              holiday.type === "idul_fitri"
-                                ? "bg-emerald-100 dark:bg-emerald-900/30"
-                                : holiday.type === "natal"
-                                ? "bg-red-100 dark:bg-red-900/30"
-                                : holiday.type === "nyepi"
+                              holiday.type === "national"
+                                ? "bg-blue-100 dark:bg-blue-900/30"
+                                : holiday.type === "special_non_working"
+                                ? "bg-amber-100 dark:bg-amber-900/30"
+                                : holiday.type === "special_working"
                                 ? "bg-yellow-100 dark:bg-yellow-900/30"
-                                : holiday.type === "waisak"
-                                ? "bg-purple-100 dark:bg-purple-900/30"
-                                : "bg-blue-100 dark:bg-blue-900/30"
+                                : holiday.type === "local"
+                                ? "bg-green-100 dark:bg-green-900/30"
+                                : holiday.type === "anniversary"
+                                ? "bg-emerald-100 dark:bg-emerald-900/30"
+                                : "bg-slate-100 dark:bg-slate-700"
                             }`}
                           >
                             <Gift
                               className={`h-6 w-6 ${
-                                holiday.type === "idul_fitri"
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : holiday.type === "natal"
-                                  ? "text-red-600 dark:text-red-400"
-                                  : holiday.type === "nyepi"
+                                holiday.type === "national"
+                                  ? "text-blue-600 dark:text-blue-400"
+                                  : holiday.type === "special_non_working"
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : holiday.type === "special_working"
                                   ? "text-yellow-600 dark:text-yellow-400"
-                                  : holiday.type === "waisak"
-                                  ? "text-purple-600 dark:text-purple-400"
-                                  : "text-blue-600 dark:text-blue-400"
+                                  : holiday.type === "local"
+                                  ? "text-green-600 dark:text-green-400"
+                                  : holiday.type === "anniversary"
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-slate-600 dark:text-slate-400"
                               }`}
                             />
                           </div>
                           <div>
                             <h4 className="font-bold text-slate-900 dark:text-white text-lg">
-                              {holiday.name}
+                              {displayLanguage === "en" ? (holiday.englishName || holiday.name) : (holiday.localName || holiday.name)}
                             </h4>
                             <p className="text-slate-600 dark:text-slate-400 mt-1">
                               {holiday.description}
@@ -305,8 +513,7 @@ const Settings: React.FC = () => {
                                   Allowance:
                                 </span>
                                 <span className="font-semibold text-slate-900 dark:text-white">
-                                  {holiday.allowanceMultiplier * 100}% dari gaji
-                                  pokok
+                                  {Math.round(holiday.allowanceMultiplier * 100)}% of base salary
                                 </span>
                               </div>
                             </div>
@@ -337,25 +544,19 @@ const Settings: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="mt-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
+                <div className="mt-8 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6">
                   <div className="flex items-start space-x-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-semibold text-amber-800 dark:text-amber-400 mb-2">
+                      <h4 className="font-semibold text-slate-900 dark:text-emerald-400 mb-2">
                         Holiday Allowance Information
                       </h4>
-                      <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                        <li>
-                          • Tunjangan Idul Fitri: 100% dari gaji pokok (wajib
-                          sesuai peraturan)
-                        </li>
-                        <li>• Tunjangan Natal: 50% dari gaji pokok</li>
-                        <li>• Tunjangan Nyepi: 50% dari gaji pokok</li>
-                        <li>• Tunjangan Waisak: 30% dari gaji pokok</li>
-                        <li>
-                          • Bonus Anniversary: 50% dari gaji pokok (setiap 15
-                          Januari)
-                        </li>
+                      <ul className="text-sm text-slate-900 dark:text-emerald-300 space-y-1">
+                        <li>• National holidays: company policy applies (usually no automatic multiplier)</li>
+                        <li>• Special non-working holidays: company may apply an allowance (configurable)</li>
+                        <li>• Special working holidays: treated as regular working day unless company policy specifies otherwise</li>
+                        <li>• Local holidays: local government holidays may be observed per branch</li>
+                        <li>• Company anniversary: configurable bonus percentage</li>
                       </ul>
                     </div>
                   </div>
@@ -376,9 +577,9 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                         System Language
                       </label>
-                      <select className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
-                        <option value="id">Bahasa Indonesia</option>
+                      <select value={systemLanguage} onChange={(e) => setSystemLanguage(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
                         <option value="en">English</option>
+                        <option value="fil">Filipino</option>
                       </select>
                     </div>
 
@@ -386,8 +587,8 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                         Currency
                       </label>
-                      <select className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
-                        <option value="IDR">Indonesian Rupiah (IDR)</option>
+                      <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+                        <option value="PHP">Philippine Peso (PHP)</option>
                         <option value="USD">US Dollar (USD)</option>
                       </select>
                     </div>
@@ -396,7 +597,7 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                         Date Format
                       </label>
-                      <select className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+                      <select value={dateFormat} onChange={(e) => setDateFormat(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
                         <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                         <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                         <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -407,23 +608,56 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                         Timezone
                       </label>
-                      <select className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+                      <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+                        <option value="Asia/Manila">Asia/Manila (PHT)</option>
                         <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
-                        <option value="Asia/Makassar">
-                          Asia/Makassar (WITA)
-                        </option>
-                        <option value="Asia/Jayapura">
-                          Asia/Jayapura (WIT)
-                        </option>
+                        <option value="UTC">UTC</option>
                       </select>
                     </div>
                   </div>
 
-                  <div className="flex justify-end">
-                    <button className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 shadow-lg">
-                      <Save className="h-4 w-4" />
-                      <span>Save Changes</span>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        // Load sensible Philippine defaults
+                        setSystemLanguage("en");
+                        setCurrency("PHP");
+                        setDateFormat("DD/MM/YYYY");
+                        setTimezone("Asia/Manila");
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2"
+                    >
+                      <span>Load Philippine Defaults (English)</span>
                     </button>
+
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => {
+                          try {
+                            const settings = {
+                              language: systemLanguage,
+                              currency,
+                              dateFormat,
+                              timezone,
+                            };
+                            if (typeof window !== "undefined") {
+                              localStorage.setItem("appSettings", JSON.stringify(settings));
+                              // notify other parts of the app to re-read settings
+                              window.dispatchEvent(new Event("appSettingsChanged"));
+                            }
+                            // small UX feedback
+                            alert("General settings saved and applied.");
+                          } catch (err) {
+                            console.error("Failed to save settings", err);
+                            alert("Failed to save settings");
+                          }
+                        }}
+                        className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                      >
+                        <Save className="h-4 w-4" />
+                        <span>Save Changes</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -471,6 +705,23 @@ const Settings: React.FC = () => {
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                       />
                     </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                      Tagline / Subtitle
+                    </label>
+                    <input
+                      type="text"
+                      value={companySettings.tagline || ""}
+                      onChange={(e) =>
+                        setCompanySettings({
+                          ...companySettings,
+                          tagline: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    />
                   </div>
 
                   <div>
@@ -645,7 +896,21 @@ const Settings: React.FC = () => {
                               >
                                 <Eye className="h-4 w-4" />
                               </button>
-                              <button className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">
+                              <button
+                                onClick={() => {
+                                  setIsEditingUser(true);
+                                  setEditingUserId(user.id);
+                                  setNewUser({
+                                    name: user.name,
+                                    email: user.email,
+                                    role: user.role as any,
+                                    permissions: user.permissions || [],
+                                    password: "",
+                                  });
+                                  setShowAddUserModal(true);
+                                }}
+                                className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                              >
                                 <Edit className="h-4 w-4" />
                               </button>
                               {user.id !== "1" && (
@@ -854,7 +1119,7 @@ const Settings: React.FC = () => {
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between p-6 sm:p-8 border-b border-slate-200 dark:border-slate-700">
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-                Add New User
+                {isEditingUser ? "Edit User" : "Add New User"}
               </h2>
               <button
                 onClick={() => setShowAddUserModal(false)}
@@ -926,7 +1191,7 @@ const Settings: React.FC = () => {
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
-                      required
+                      required={!isEditingUser}
                       value={newUser.password}
                       onChange={(e) =>
                         setNewUser({ ...newUser, password: e.target.value })
@@ -1002,7 +1267,7 @@ const Settings: React.FC = () => {
                   type="submit"
                   className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg"
                 >
-                  Add User
+                  {isEditingUser ? "Save Changes" : "Add User"}
                 </button>
               </div>
             </form>

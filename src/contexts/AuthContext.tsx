@@ -22,21 +22,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const users: Record<string, { password: string; user: User }> = {
-  "owner@enjoydive.com": {
+  "owner@bayanisolutions.com": {
     password: "owner123",
     user: {
       id: "1",
-      name: "Made Sutrisno",
-      email: "owner@enjoydive.com",
+      name: "Owner (Bayani)",
+      email: "owner@bayanisolutions.com",
       role: "Owner",
     },
   },
-  "admin@enjoydive.com": {
+  "admin@bayanisolutions.com": {
     password: "admin123",
     user: {
       id: "2",
-      name: "Kadek Sari Dewi",
-      email: "admin@enjoydive.com",
+      name: "Admin (Bayani)",
+      email: "admin@bayanisolutions.com",
       role: "Admin",
     },
   },
@@ -57,7 +57,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // First, try server-side authentication so DB users can log in
+    try {
+      const res = await fetch(`/api/auth`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+      if (res.ok) {
+        const payload = await res.json();
+        if (payload && payload.user) {
+          const mapped = { id: payload.user.id, name: payload.user.name, email: payload.user.email, role: payload.user.role };
+          setUser(mapped);
+          if (typeof window !== "undefined") localStorage.setItem("user", JSON.stringify(mapped));
+          setIsLoading(false);
+          router.push("/dashboard");
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn("Server auth failed", err);
+    }
+
+    // Fallback: Check localStorage 'appUsers' (demo convenience) then built-in demo users
+    try {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("appUsers");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const found = parsed.find((u: any) => u.email === email && u.password === password);
+            if (found) {
+              const mapped = { id: found.id, name: found.name, email: found.email, role: found.role };
+              setUser(mapped);
+              localStorage.setItem("user", JSON.stringify(mapped));
+              setIsLoading(false);
+              router.push("/dashboard");
+              return true;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error reading appUsers for login", err);
+    }
+
     const userRecord = users[email];
     if (userRecord && userRecord.password === password) {
       setUser(userRecord.user);
@@ -68,6 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       router.push("/dashboard");
       return true;
     }
+
     setIsLoading(false);
     return false;
   };

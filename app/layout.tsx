@@ -36,8 +36,25 @@ export default function RootLayout({
               var ls = localStorage.getItem('theme');
               var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
               var useDark = ls ? ls === 'dark' : prefersDark;
+              // Force light mode for the login route to avoid a flash of dark mode on first paint
+              var path = location && location.pathname ? location.pathname : '';
+              if (path === '/login' || path.indexOf('/login') === 0) {
+                useDark = false;
+              }
               var root = document.documentElement;
               if (useDark) root.classList.add('dark'); else root.classList.remove('dark');
+            } catch (e) { /* no-op */ }
+          })();
+          `}
+        </Script>
+        <Script id="disable-right-click" strategy="afterInteractive">
+          {`
+          (function(){
+            try {
+              // Prevent browser context menu (right-click)
+              document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+              // Prevent ContextMenu key on keyboards
+              document.addEventListener('keydown', function(e){ if (e.key === 'ContextMenu') e.preventDefault(); });
             } catch (e) { /* no-op */ }
           })();
           `}

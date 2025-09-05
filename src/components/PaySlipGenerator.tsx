@@ -168,19 +168,19 @@ const PaySlipGenerator: React.FC = () => {
 
       {/* Holiday Alert */}
       {activeHoliday && (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
+        <div className="bg-emerald-50 dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-emerald-200 dark:border-slate-700">
           <div className="flex items-center space-x-4">
-            <div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-              <Gift className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
+            <div className="bg-emerald-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+              <Gift className="h-6 w-6 lg:h-8 lg:w-8 text-emerald-700 dark:text-slate-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-emerald-400">
+              <h3 className="text-lg font-bold text-emerald-900 dark:text-emerald-400">
                 {activeHoliday.name}
               </h3>
-              <p className="text-slate-500 dark:text-emerald-300 mt-1">
-                {activeHoliday.description} - Tunjangan otomatis akan
-                ditambahkan ({activeHoliday.allowanceMultiplier * 100}% dari
-                gaji pokok)
+                <p className="text-emerald-700 dark:text-emerald-300 mt-1">
+                  {activeHoliday.description} - Holiday allowance will be
+                  automatically applied ({Math.round(activeHoliday.allowanceMultiplier * 100)}% of
+                  base salary)
               </p>
             </div>
           </div>
@@ -222,9 +222,9 @@ const PaySlipGenerator: React.FC = () => {
               <option value="11/2024">11/2024</option>
               <option value="10/2024">10/2024</option>
               <option value="9/2024">9/2024</option>
-              <option value="4/2024">4/2024 (Idul Fitri)</option>
-              <option value="3/2024">3/2024 (Nyepi)</option>
-              <option value="1/2024">1/2024 (Anniversary)</option>
+              <option value="4/2024">4/2024 (Eid al-Fitr)</option>
+              <option value="3/2024">3/2024 (Local Holiday)</option>
+              <option value="1/2024">1/2024 (Company Anniversary)</option>
             </select>
           </div>
 
@@ -293,17 +293,17 @@ const PaySlipGenerator: React.FC = () => {
 
             {/* Holiday Banner */}
             {payslip.holidayType && (
-              <div className="bg-white dark:bg-slate-800 p-6 rounded-xl mb-8 shadow-lg border border-slate-200 dark:border-slate-700">
+              <div className="bg-emerald-50 dark:bg-slate-800 p-6 rounded-xl mb-8 shadow-lg border border-emerald-200 dark:border-slate-700">
                 <div className="flex items-center space-x-4">
-                  <div className="bg-slate-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-                    <Gift className="h-6 w-6 lg:h-8 lg:w-8 text-slate-600 dark:text-slate-400" />
+                  <div className="bg-emerald-100 dark:bg-slate-700 p-3 lg:p-4 rounded-xl group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                    <Gift className="h-6 w-6 lg:h-8 lg:w-8 text-emerald-700 dark:text-slate-400" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-emerald-400">
+                    <h3 className="text-xl font-bold text-emerald-900 dark:text-emerald-400">
                       {getHolidayName(payslip.holidayType)}
                     </h3>
-                    <p className="text-slate-500 dark:text-emerald-100">
-                      Selamat hari raya! Tunjangan khusus telah ditambahkan.
+                    <p className="text-emerald-700 dark:text-emerald-100">
+                      Holiday allowance has been applied where applicable.
                     </p>
                   </div>
                 </div>
@@ -453,7 +453,7 @@ const PaySlipGenerator: React.FC = () => {
                     {payslip.allowances.tips > 0 && (
                       <div className="flex justify-between py-2">
                         <span className="text-slate-700 dark:text-slate-300 font-medium">
-                          Tips dari Tamu
+                          Guest Tips
                         </span>
                         <span className="font-bold text-slate-900 dark:text-white">
                           {formatCurrency(payslip.allowances.tips)}
@@ -463,9 +463,7 @@ const PaySlipGenerator: React.FC = () => {
                     {payslip.allowances.holidayAllowance > 0 && (
                       <div className="flex justify-between py-2 bg-emerald-100 dark:bg-emerald-800/30 px-3 rounded-lg">
                         <span className="text-emerald-700 dark:text-emerald-300 font-medium">
-                          {payslip.holidayType
-                            ? getHolidayName(payslip.holidayType)
-                            : "Tunjangan Hari Raya"}
+                          {payslip.holidayType ? getHolidayName(payslip.holidayType) : "Holiday Allowance"}
                         </span>
                         <span className="font-bold text-emerald-800 dark:text-emerald-200">
                           {formatCurrency(payslip.allowances.holidayAllowance)}
@@ -523,7 +521,7 @@ const PaySlipGenerator: React.FC = () => {
                     {payslip.deductions.cooperativeFund > 0 && (
                       <div className="flex justify-between py-2">
                         <span className="text-slate-700 dark:text-slate-300 font-medium">
-                          Dana Koperasi
+                          Cooperative Fund
                         </span>
                         <span className="font-bold text-slate-900 dark:text-white">
                           {formatCurrency(payslip.deductions.cooperativeFund)}
@@ -533,7 +531,7 @@ const PaySlipGenerator: React.FC = () => {
                     {payslip.deductions.healthInsurance > 0 && (
                       <div className="flex justify-between py-2">
                         <span className="text-slate-700 dark:text-slate-300 font-medium">
-                          Asuransi Kesehatan
+                          Health Insurance
                         </span>
                         <span className="font-bold text-slate-900 dark:text-white">
                           {formatCurrency(payslip.deductions.healthInsurance)}
@@ -543,7 +541,7 @@ const PaySlipGenerator: React.FC = () => {
                     {payslip.deductions.loanDeduction > 0 && (
                       <div className="flex justify-between py-2">
                         <span className="text-slate-700 dark:text-slate-300 font-medium">
-                          Potongan Kasbon
+                          Loan Deductions
                         </span>
                         <span className="font-bold text-slate-900 dark:text-white">
                           {formatCurrency(payslip.deductions.loanDeduction)}

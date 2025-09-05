@@ -20,6 +20,8 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   source?: AttendanceSource;
   notes?: string;
+  // If true, the employee worked on a public/company holiday for that date
+  workedOnHoliday?: boolean;
 }
 
 export interface LeaveRequest {

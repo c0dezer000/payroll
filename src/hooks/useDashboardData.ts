@@ -36,7 +36,19 @@ export const useDashboardData = () => {
         for (let i = 11; i >= 0; i--) {
           const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
           const period = `${date.getMonth() + 1}/${date.getFullYear()}`;
-          const monthName = date.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
+          // Use saved app settings locale when available so dashboard respects user preferences
+          let locale = "en-US";
+          try {
+            if (typeof window !== "undefined") {
+              const raw = localStorage.getItem("appSettings");
+              const parsed = raw ? JSON.parse(raw) : {};
+              locale = parsed.language || "en-US";
+            }
+          } catch (e) {
+            // ignore and use default
+          }
+
+          const monthName = date.toLocaleDateString(locale, { month: "short", year: "2-digit" });
 
           let monthlyPayroll = 0;
           let monthlyEmployees = activeEmployees;

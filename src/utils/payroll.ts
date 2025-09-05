@@ -1,100 +1,71 @@
 import { type Employee, type PaySlip, type HolidayCalendar } from "../types";
+import { getCachedHolidaysForYear } from "./holidays";
 
 // Holiday calendar for 2024-2025
 export const holidayCalendar: HolidayCalendar[] = [
   {
-    id: "idul_fitri_2024",
-    name: "Idul Fitri 2024",
-    date: "2024-04-10",
-    type: "idul_fitri",
-    description: "Hari Raya Idul Fitri 1445 H",
-    allowanceMultiplier: 1.0, // 1x gaji pokok
+    id: "new_year",
+    name: "New Year's Day",
+    date: "2024-01-01",
+  type: "national",
+    description: "New Year's Day",
+    allowanceMultiplier: 0.0,
     isActive: true,
-    eligibleReligions: ["islam"],
+    eligibleReligions: ["all"],
   },
   {
-    id: "natal_2024",
-    name: "Natal 2024",
+    id: "independence_day",
+    name: "Independence Day",
+    date: "2024-06-12",
+  type: "national",
+    description: "Philippine Independence Day",
+    allowanceMultiplier: 0.0,
+    isActive: true,
+    eligibleReligions: ["all"],
+  },
+  {
+    id: "christmas_2024",
+    name: "Christmas Day",
     date: "2024-12-25",
-    type: "natal",
-    description: "Hari Raya Natal",
-    allowanceMultiplier: 0.5, // 0.5x gaji pokok
+  type: "national",
+    description: "Christmas Day",
+    allowanceMultiplier: 0.5,
     isActive: true,
-    eligibleReligions: ["kristen", "katolik"],
+    eligibleReligions: ["christian", "catholic", "all"],
   },
   {
-    id: "nyepi_2024",
-    name: "Nyepi 2024",
-    date: "2024-03-11",
-    type: "nyepi",
-    description: "Hari Raya Nyepi (Tahun Baru Saka)",
-    allowanceMultiplier: 0.5, // 0.5x gaji pokok
+    id: "eid_2024",
+    name: "Eid al-Fitr",
+    date: "2024-04-10",
+  type: "special_non_working",
+    description: "Eid al-Fitr",
+    allowanceMultiplier: 0.5,
     isActive: true,
-    eligibleReligions: ["hindu"],
-  },
-  {
-    id: "waisak_2024",
-    name: "Waisak 2024",
-    date: "2024-05-23",
-    type: "waisak",
-    description: "Hari Raya Waisak",
-    allowanceMultiplier: 0.3, // 0.3x gaji pokok
-    isActive: true,
-    eligibleReligions: ["budha"],
+    eligibleReligions: ["muslim"],
   },
   {
     id: "anniversary_2024",
-    name: "Bonus Tahunan September 2024",
+    name: "Company Anniversary Bonus",
     date: "2024-09-15",
     type: "anniversary",
-    description: "Bonus Tahunan Enjoy Dive",
-    allowanceMultiplier: 0.5, // 0.5x gaji pokok
+    description: "Company Anniversary Bonus",
+    allowanceMultiplier: 0.5,
     isActive: true,
-    eligibleReligions: [
-      "islam",
-      "kristen",
-      "katolik",
-      "hindu",
-      "budha",
-      "other",
-    ], // semua agama
-  },
-  {
-    id: "idul_fitri_2025",
-    name: "Idul Fitri 2025",
-    date: "2025-03-30",
-    type: "idul_fitri",
-    description: "Hari Raya Idul Fitri 1446 H",
-    allowanceMultiplier: 1.0, // 1x gaji pokok
-    isActive: true,
-    eligibleReligions: ["islam"],
-  },
-  {
-    id: "anniversary_2025",
-    name: "Bonus Tahunan September 2025",
-    date: "2025-09-15",
-    type: "anniversary",
-    description: "Bonus Tahunan Enjoy Dive",
-    allowanceMultiplier: 0.5, // 0.5x gaji pokok
-    isActive: true,
-    eligibleReligions: [
-      "islam",
-      "kristen",
-      "katolik",
-      "hindu",
-      "budha",
-      "other",
-    ], // semua agama
+    eligibleReligions: ["all"],
   },
 ];
 
 export const getActiveHolidayForPeriod = (
-  period: string
+  period: string,
+  holidays?: HolidayCalendar[]
 ): HolidayCalendar | null => {
   const [month, year] = period.split("/").map(Number);
 
-  // Check if there's an active holiday in this period
-  const activeHoliday = holidayCalendar.find((holiday) => {
+  // Prefer explicit holidays array. Otherwise check cached/hydrated holidays for the year. Fall back to built-in defaults.
+  const cached = getCachedHolidaysForYear(year);
+  const pool = holidays && holidays.length > 0 ? holidays : (cached && cached.length > 0 ? cached : holidayCalendar);
+
+  const activeHoliday = pool.find((holiday) => {
     if (!holiday.isActive) return false;
 
     const holidayDate = new Date(holiday.date);
@@ -108,18 +79,20 @@ export const getActiveHolidayForPeriod = (
 
 export const calculateHolidayAllowance = (
   employee: Employee,
-  period: string
+  period: string,
+  holidays?: HolidayCalendar[]
 ): { amount: number; type: string | null } => {
-  const activeHoliday = getActiveHolidayForPeriod(period);
+  const activeHoliday = getActiveHolidayForPeriod(period, holidays);
 
   if (!activeHoliday) {
     return { amount: (employee.allowances?.holidayAllowance as number) || 0, type: null };
   }
 
-  // Check if employee's religion is eligible for this holiday
-  const isEligibleByReligion = activeHoliday.eligibleReligions.includes(
-    employee.religion
-  );
+  // Check if employee's religion (or group) is eligible for this holiday
+  const eligibleList = activeHoliday.eligibleReligions || ["all"];
+  const isEligibleByReligion =
+    eligibleList.includes("all") || eligibleList.includes(employee.religion);
+
   if (!isEligibleByReligion) {
     return { amount: (employee.allowances?.holidayAllowance as number) || 0, type: null };
   }
@@ -132,17 +105,12 @@ export const calculateHolidayAllowance = (
 };
 
 export const calculateTipsDistribution = (): number => {
-  // Tips dikumpulkan secara kolektif dan dibagikan hanya kepada non-manajerial
-  // Simulasi total tips yang dikumpulkan per bulan
-  const baseTips = 15000000; // 15 juta per bulan
-  const variation = (Math.random() - 0.5) * 0.3; // ±15% variasi
+  // Aggregate tips distribution simulation for Philippines context
+  const baseTips = 150000; // PHP 150,000 per month (example)
+  const variation = (Math.random() - 0.5) * 0.3; // ±15% variation
   const totalTips = baseTips * (1 + variation);
 
-  // Hitung jumlah karyawan non-manajerial yang berhak dapat tips
-  // (dive master, supir, diving instructor)
-
-  // Simulasi jumlah karyawan yang berhak (akan dihitung dari data aktual di implementasi)
-  const eligibleEmployeeCount = 20; // estimasi
+  const eligibleEmployeeCount = 20; // estimate for simulation
 
   return Math.round(totalTips / eligibleEmployeeCount);
 };
@@ -301,6 +269,30 @@ export const calculatePayroll = (
 };
 
 export const formatCurrency = (amount: number): string => {
+  try {
+    // Use runtime settings when available (saved by Settings page)
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("appSettings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const locale = parsed.language || "fil-PH";
+        const currency = parsed.currency || "PHP";
+        // minimumFractionDigits can be provided by settings, default to 0 for PHP whole amounts
+        const minFrac = typeof parsed.currencyDecimalDigits === "number" ? parsed.currencyDecimalDigits : 0;
+        const maxFrac = typeof parsed.currencyDecimalDigits === "number" ? parsed.currencyDecimalDigits : 0;
+
+        return new Intl.NumberFormat(locale, {
+          style: "currency",
+          currency,
+          minimumFractionDigits: minFrac,
+          maximumFractionDigits: maxFrac,
+        }).format(amount);
+      }
+    }
+  } catch (err) {
+    // fall through to default
+  }
+
   return new Intl.NumberFormat("fil-PH", {
     style: "currency",
     currency: "PHP",
@@ -310,11 +302,34 @@ export const formatCurrency = (amount: number): string => {
 };
 
 export const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString("fil-PH", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  try {
+    const date = new Date(dateString);
+
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("appSettings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const locale = parsed.language || "fil-PH";
+        const dateFormat = parsed.dateFormat || "long"; // expected values: long, short, numeric
+
+        const monthOption: Intl.DateTimeFormatOptions['month'] = dateFormat === 'short' ? 'short' : (dateFormat === 'numeric' ? 'numeric' : 'long');
+
+        return date.toLocaleDateString(locale, {
+          day: 'numeric',
+          month: monthOption,
+          year: 'numeric',
+        });
+      }
+    }
+
+    return date.toLocaleDateString('fil-PH', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  } catch (err) {
+    return dateString;
+  }
 };
 
 export const getCurrentPeriod = (): string => {
@@ -323,12 +338,14 @@ export const getCurrentPeriod = (): string => {
 };
 
 export const getHolidayName = (type: string): string => {
-  const names = {
-    idul_fitri: "Tunjangan Idul Fitri",
-    natal: "Tunjangan Natal",
-    nyepi: "Tunjangan Nyepi",
-    waisak: "Tunjangan Waisak",
-    anniversary: "Bonus Tahunan",
+  const names: Record<string, string> = {
+    regular: "Holiday Allowance",
+    national: "National Holiday Allowance",
+    special_non_working: "Special Non-Working Holiday Allowance",
+    special_working: "Special Working Holiday Allowance",
+    local: "Local Holiday Allowance",
+    anniversary: "Company Anniversary Bonus",
   };
-  return names[type as keyof typeof names] || "Tunjangan Hari Raya";
+
+  return names[type] || "Holiday Allowance";
 };

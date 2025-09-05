@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as client from "./attendanceClient";
 import type { AttendanceRecord } from "./types";
+import { getCachedHolidaysForYear } from "../utils/holidays";
 
 type Props = { employeeId: string };
 
@@ -22,6 +23,17 @@ export const AttendanceHistory: React.FC<Props> = ({ employeeId }) => {
 
   const totalPages = Math.max(1, Math.ceil(records.length / pageSize));
   const pageData = useMemo(() => records.slice((page - 1) * pageSize, page * pageSize), [records, page]);
+
+  // helper: check if a date string (yyyy-mm-dd) is a holiday in its year
+  const isHolidayDate = (dateStr: string) => {
+    try {
+      const y = new Date(dateStr).getFullYear();
+      const cached = getCachedHolidaysForYear(y) || [];
+      return cached.some((h) => h.date === dateStr && h.isActive);
+    } catch (err) {
+      return false;
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
@@ -59,9 +71,14 @@ export const AttendanceHistory: React.FC<Props> = ({ employeeId }) => {
                     <td className="p-2">{r.hoursWorked ?? "—"}</td>
                     <td className="p-2">{r.overtimeHours ?? "—"}</td>
                     <td className="p-2">
-                      <span className={`px-2 py-1 rounded-full text-sm ${r.status === "present" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                        {r.status}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 rounded-full text-sm ${r.status === "present" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                          {r.status}
+                        </span>
+                        {r.status === "present" && isHolidayDate(r.date) && (
+                          <span className="px-2 py-1 rounded-full text-sm bg-amber-100 text-amber-800">Worked on Holiday</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

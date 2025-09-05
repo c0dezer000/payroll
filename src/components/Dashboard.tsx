@@ -21,11 +21,84 @@ import {
 } from "lucide-react";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { formatCurrency, getCurrentPeriod } from "../utils/payroll";
+import { ensureHolidaysHydrated } from "../utils/holidays";
 import DepartmentChart from "./charts/DepartmentChart";
 import ReportsModal from "./modals/ReportsModal";
 
 const Dashboard: React.FC = () => {
 	const { stats, loading } = useDashboardData();
+	// Company settings (phone, name, tagline, address, email) read from localStorage so Settings changes apply live
+	const [companyState, setCompanyState] = React.useState({
+		name: "Bayani Solutions",
+		tagline: "Payroll & HR Solutions for Filipinos",
+		address: "Ortigas Center, Pasig City, Metro Manila",
+		phone: "+63 2 8888 1234",
+		email: "info@bayanisolutions.com",
+	});
+
+	React.useEffect(() => {
+		const load = () => {
+			try {
+				if (typeof window !== 'undefined') {
+					const raw = localStorage.getItem('companySettings');
+					if (raw) {
+						const parsed = JSON.parse(raw);
+						setCompanyState({
+							name: parsed.name || 'Bayani Solutions',
+							tagline: parsed.tagline || 'Payroll & HR Solutions for Filipinos',
+							address: parsed.address || 'Ortigas Center, Pasig City, Metro Manila',
+							phone: parsed.phone || '+63 2 8888 1234',
+							email: parsed.email || 'info@bayanisolutions.com',
+						});
+					}
+				}
+			} catch (e) {
+				// ignore and keep defaults
+			}
+		};
+
+		load();
+		const handler = () => load();
+		if (typeof window !== 'undefined') window.addEventListener('companySettingsChanged', handler);
+		return () => { if (typeof window !== 'undefined') window.removeEventListener('companySettingsChanged', handler); };
+	}, []);
+
+	// Hydrate public Philippine holidays for client-side payroll logic
+	React.useEffect(() => {
+		// fire-and-forget
+		ensureHolidaysHydrated().catch(() => {
+			// ignore
+		});
+	}, []);
+
+	// Company settings (phone, name, email) read from localStorage so Settings changes apply live
+	const [company, setCompany] = React.useState({
+		name: "Bayani Solutions",
+		address: "Ortigas Center, Pasig City, Metro Manila",
+		phone: "+63 2 8888 1234",
+		email: "info@bayanisolutions.com",
+	});
+
+	React.useEffect(() => {
+		const load = () => {
+			try {
+				if (typeof window !== "undefined") {
+					const raw = localStorage.getItem("companySettings");
+					if (raw) setCompany(JSON.parse(raw));
+				}
+			} catch (e) {
+				// ignore parse errors
+			}
+		};
+
+		load();
+
+		const handler = () => load();
+		if (typeof window !== "undefined") window.addEventListener("companySettingsChanged", handler);
+		return () => {
+			if (typeof window !== "undefined") window.removeEventListener("companySettingsChanged", handler);
+		};
+	}, []);
 	const [showReports, setShowReports] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 
@@ -91,18 +164,23 @@ const Dashboard: React.FC = () => {
 
 	const currentPeriod = getCurrentPeriod();
 	const previousMonthPayroll =
-		stats.payrollHistory[stats.payrollHistory.length - 2]?.totalAmount || 0;
+		stats.payrollHistory && stats.payrollHistory.length >= 2
+			? stats.payrollHistory[stats.payrollHistory.length - 2]?.totalAmount || 0
+			: 0;
 	const payrollGrowth =
 		previousMonthPayroll > 0
-			? ((stats.totalPayroll - previousMonthPayroll) / previousMonthPayroll) *
-				100
+			? ((stats.totalPayroll - previousMonthPayroll) / previousMonthPayroll) * 100
 			: 0;
 
 	// Calculate additional metrics
-	const avgSalary = Math.round(stats.totalPayroll / stats.activeEmployees);
-	const largestDepartment = Object.entries(stats.departmentStats).reduce(
-		(a, b) => (a[1] > b[1] ? a : b)
-	);
+	const avgSalary =
+		stats.activeEmployees && stats.activeEmployees > 0
+			? Math.round(stats.totalPayroll / stats.activeEmployees)
+			: 0;
+	const deptEntries = Object.entries(stats.departmentStats || {});
+	const largestDepartment = deptEntries.length
+		? deptEntries.reduce((a, b) => (a[1] > b[1] ? a : b))
+		: ["-", 0];
 	const recentTrend = stats.monthlyTrend.slice(-3);
 	const trendDirection =
 		recentTrend.length >= 2
@@ -125,11 +203,11 @@ const Dashboard: React.FC = () => {
 								</div>
 								<div>
 									<h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white">
-										Enjoy Dive
-									</h1>
-									<p className="text-slate-500 dark:text-slate-400 text-base sm:text-lg lg:text-xl mt-1">
-										Premier Diving Center in Bali
-									</p>
+										{companyState.name}
+										</h1>
+										<p className="text-slate-500 dark:text-slate-400 text-base sm:text-lg lg:text-xl mt-1">
+											{companyState.tagline}
+										</p>
 								</div>
 							</div>
 
@@ -137,17 +215,17 @@ const Dashboard: React.FC = () => {
 								<div className="flex items-center space-x-3">
 									<MapPin className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-slate-600 dark:text-slate-400" />
 										<span className="text-slate-900 dark:text-slate-200 truncate">
-										Sanur Beach, Bali, Indonesia
-									</span>
+												{companyState.address}
+											</span>
 								</div>
 								<div className="flex items-center space-x-3">
 									<Phone className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-slate-600 dark:text-slate-400" />
-									<span className="text-slate-900 dark:text-slate-200">+62 361 288 829</span>
+									<span className="text-slate-900 dark:text-slate-200">{companyState.phone}</span>
 								</div>
 								<div className="flex items-center space-x-3 md:col-span-2 xl:col-span-1">
 									<Mail className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-slate-600 dark:text-slate-400" />
 									<span className="text-slate-900 dark:text-slate-200 truncate">
-										info@enjoydive.com
+										{companyState.email}
 									</span>
 								</div>
 							</div>
@@ -222,9 +300,9 @@ const Dashboard: React.FC = () => {
 							</span>
 							<span className="text-slate-400 text-sm">
 								(
-								{Math.round(
-									(stats.activeEmployees / stats.totalEmployees) * 100
-								)}
+								{stats.totalEmployees && stats.totalEmployees > 0
+									? Math.round((stats.activeEmployees / stats.totalEmployees) * 100)
+									: 0}
 								%)
 							</span>
 						</div>
@@ -250,7 +328,7 @@ const Dashboard: React.FC = () => {
 
 						<div className="flex-1">
 							<p className="text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white leading-none break-words">
-								{formatCurrency(stats.totalPayroll).replace("Rp", "Rp ")}
+								{formatCurrency(stats.totalPayroll)}
 							</p>
 						</div>
 
@@ -319,7 +397,7 @@ const Dashboard: React.FC = () => {
 
 						<div className="flex-1">
 							<p className="text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white leading-none break-words">
-								{formatCurrency(avgSalary).replace("Rp", "Rp ")}
+								{formatCurrency(avgSalary)}
 							</p>
 						</div>
 
@@ -373,7 +451,7 @@ const Dashboard: React.FC = () => {
 									Total Amount
 								</span>
 								<span className="font-bold text-slate-900 dark:text-white">
-									{formatCurrency(stats.totalPayroll).replace("Rp", "Rp ")}
+											{formatCurrency(stats.totalPayroll)}
 								</span>
 							</div>
 							<div className="flex justify-between items-center">
@@ -381,7 +459,7 @@ const Dashboard: React.FC = () => {
 									Per Employee
 								</span>
 								<span className="font-bold text-slate-900 dark:text-white">
-									{formatCurrency(avgSalary).replace("Rp", "Rp ")}
+									{formatCurrency(avgSalary)}
 								</span>
 							</div>
 						</div>

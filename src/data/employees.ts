@@ -87,7 +87,7 @@ export const employees: Employee[] = [
     name: "Wayan Agus Pratama",
     position: "Marketing Manager",
     department: "Marketing",
-    email: "marketing.manager@enjoydive.com",
+  email: "marketing.manager@bayanisolutions.com",
     phone: "+62 813-3456-7892",
     baseSalary: 12000000,
     allowances: {
@@ -126,7 +126,7 @@ export const employees: Employee[] = [
     name: "Ni Putu Ayu Sinta",
     position: "Marketing Executive",
     department: "Marketing",
-    email: "marketing1@enjoydive.com",
+  email: "marketing1@bayanisolutions.com",
     phone: "+62 814-3456-7893",
     baseSalary: 7500000,
     allowances: {
@@ -165,7 +165,7 @@ export const employees: Employee[] = [
     name: "I Komang Adi Saputra",
     position: "Marketing Executive",
     department: "Marketing",
-    email: "marketing2@enjoydive.com",
+  email: "marketing2@bayanisolutions.com",
     phone: "+62 815-3456-7894",
     baseSalary: 7500000,
     allowances: {
@@ -205,7 +205,7 @@ export const employees: Employee[] = [
     name: "Made Indra Wijaya",
     position: "Purchasing Manager",
     department: "Purchasing",
-    email: "purchasing.manager@enjoydive.com",
+  email: "purchasing.manager@bayanisolutions.com",
     phone: "+62 816-3456-7895",
     baseSalary: 10000000,
     allowances: {
@@ -244,7 +244,7 @@ export const employees: Employee[] = [
     name: "Ketut Widya Astuti",
     position: "Purchasing Staff",
     department: "Purchasing",
-    email: "purchasing@enjoydive.com",
+  email: "purchasing@bayanisolutions.com",
     phone: "+62 817-3456-7896",
     baseSalary: 6500000,
     allowances: {
@@ -284,7 +284,7 @@ export const employees: Employee[] = [
     name: "Gede Arya Pratama",
     position: "IT Manager",
     department: "Information Technology",
-    email: "it.manager@enjoydive.com",
+  email: "it.manager@bayanisolutions.com",
     phone: "+62 818-3456-7897",
     baseSalary: 15000000,
     allowances: {
@@ -323,7 +323,7 @@ export const employees: Employee[] = [
     name: "Putu Devi Rahayu",
     position: "IT Support",
     department: "Information Technology",
-    email: "it.support@enjoydive.com",
+  email: "it.support@bayanisolutions.com",
     phone: "+62 819-3456-7898",
     baseSalary: 8500000,
     allowances: {
@@ -363,7 +363,7 @@ export const employees: Employee[] = [
     name: "Wayan Susila",
     position: "Equipment Manager",
     department: "Equipment",
-    email: "equipment@enjoydive.com",
+  email: "equipment@bayanisolutions.com",
     phone: "+62 820-3456-7899",
     baseSalary: 9000000,
     allowances: {
@@ -403,7 +403,7 @@ export const employees: Employee[] = [
     name: "Made Bayu Santika",
     position: "Senior Diving Instructor",
     department: "Diving Operations",
-    email: "instructor1@enjoydive.com",
+  email: "instructor1@bayanisolutions.com",
     phone: "+62 821-3456-7800",
     baseSalary: 12000000,
     allowances: {
@@ -442,7 +442,7 @@ export const employees: Employee[] = [
     name: "Ketut Yoga Pradana",
     position: "Diving Instructor",
     department: "Diving Operations",
-    email: "instructor2@enjoydive.com",
+  email: "instructor2@bayanisolutions.com",
     phone: "+62 822-3456-7801",
     baseSalary: 10000000,
     allowances: {
@@ -481,7 +481,7 @@ export const employees: Employee[] = [
     name: "Ni Made Lestari",
     position: "Diving Instructor",
     department: "Diving Operations",
-    email: "instructor3@enjoydive.com",
+  email: "instructor3@bayanisolutions.com",
     phone: "+62 823-3456-7802",
     baseSalary: 10000000,
     allowances: {
@@ -520,7 +520,7 @@ export const employees: Employee[] = [
     name: "I Gede Wirawan",
     position: "Diving Instructor",
     department: "Diving Operations",
-    email: "instructor4@enjoydive.com",
+  email: "instructor4@bayanisolutions.com",
     phone: "+62 824-3456-7803",
     baseSalary: 10000000,
     allowances: {
@@ -559,7 +559,7 @@ export const employees: Employee[] = [
     name: "Putu Eka Saputra",
     position: "Diving Instructor",
     department: "Diving Operations",
-    email: "instructor5@enjoydive.com",
+  email: "instructor5@bayanisolutions.com",
     phone: "+62 825-3456-7804",
     baseSalary: 9500000,
     allowances: {
@@ -599,7 +599,7 @@ export const employees: Employee[] = [
     name: "Wayan Rudi Hartana",
     position: "Senior Dive Master",
     department: "Diving Operations",
-    email: "divemaster1@enjoydive.com",
+  email: "divemaster1@bayanisolutions.com",
     phone: "+62 826-3456-7805",
     baseSalary: 8500000,
     allowances: {
@@ -638,7 +638,7 @@ export const employees: Employee[] = [
     name: "Made Agung Permana",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster2@enjoydive.com",
+  email: "divemaster2@bayanisolutions.com",
     phone: "+62 827-3456-7806",
     baseSalary: 7500000,
     allowances: {
@@ -677,7 +677,7 @@ export const employees: Employee[] = [
     name: "Ketut Surya Dinata",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster3@enjoydive.com",
+  email: "divemaster3@bayanisolutions.com",
     phone: "+62 828-3456-7807",
     baseSalary: 7500000,
     allowances: {
@@ -716,7 +716,7 @@ export const employees: Employee[] = [
     name: "Ni Kadek Putri Maharani",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster4@enjoydive.com",
+  email: "divemaster4@bayanisolutions.com",
     phone: "+62 829-3456-7808",
     baseSalary: 7500000,
     allowances: {
@@ -755,7 +755,7 @@ export const employees: Employee[] = [
     name: "I Made Dwi Kurniawan",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster5@enjoydive.com",
+  email: "divemaster5@bayanisolutions.com",
     phone: "+62 830-3456-7809",
     baseSalary: 7000000,
     allowances: {
@@ -794,7 +794,7 @@ export const employees: Employee[] = [
     name: "Gede Ari Pradana",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster6@enjoydive.com",
+  email: "divemaster6@bayanisolutions.com",
     phone: "+62 831-3456-7810",
     baseSalary: 7000000,
     allowances: {
@@ -833,7 +833,7 @@ export const employees: Employee[] = [
     name: "Putu Aditya Nugraha",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster7@enjoydive.com",
+  email: "divemaster7@bayanisolutions.com",
     phone: "+62 832-3456-7811",
     baseSalary: 7000000,
     allowances: {
@@ -872,7 +872,7 @@ export const employees: Employee[] = [
     name: "Wayan Indra Kusuma",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster8@enjoydive.com",
+  email: "divemaster8@bayanisolutions.com",
     phone: "+62 833-3456-7812",
     baseSalary: 6500000,
     allowances: {
@@ -911,7 +911,7 @@ export const employees: Employee[] = [
     name: "Made Eko Saputra",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster9@enjoydive.com",
+  email: "divemaster9@bayanisolutions.com",
     phone: "+62 834-3456-7813",
     baseSalary: 6500000,
     allowances: {
@@ -950,7 +950,7 @@ export const employees: Employee[] = [
     name: "Ketut Bagus Wirawan",
     position: "Dive Master",
     department: "Diving Operations",
-    email: "divemaster10@enjoydive.com",
+  email: "divemaster10@bayanisolutions.com",
     phone: "+62 835-3456-7814",
     baseSalary: 6500000,
     allowances: {
@@ -990,7 +990,7 @@ export const employees: Employee[] = [
     name: "I Wayan Suteja",
     position: "Senior Driver",
     department: "Transportation",
-    email: "driver1@enjoydive.com",
+  email: "driver1@bayanisolutions.com",
     phone: "+62 836-3456-7815",
     baseSalary: 6000000,
     allowances: {
@@ -1029,7 +1029,7 @@ export const employees: Employee[] = [
     name: "Made Jaya Kusuma",
     position: "Driver",
     department: "Transportation",
-    email: "driver2@enjoydive.com",
+  email: "driver2@bayanisolutions.com",
     phone: "+62 837-3456-7816",
     baseSalary: 5500000,
     allowances: {
@@ -1068,7 +1068,7 @@ export const employees: Employee[] = [
     name: "Ketut Darma Yasa",
     position: "Driver",
     department: "Transportation",
-    email: "driver3@enjoydive.com",
+  email: "driver3@bayanisolutions.com",
     phone: "+62 838-3456-7817",
     baseSalary: 5500000,
     allowances: {
@@ -1107,7 +1107,7 @@ export const employees: Employee[] = [
     name: "Putu Agus Pratama",
     position: "Driver",
     department: "Transportation",
-    email: "driver4@enjoydive.com",
+  email: "driver4@bayanisolutions.com",
     phone: "+62 839-3456-7818",
     baseSalary: 5000000,
     allowances: {
@@ -1146,7 +1146,7 @@ export const employees: Employee[] = [
     name: "Wayan Sudarma",
     position: "Driver",
     department: "Transportation",
-    email: "driver5@enjoydive.com",
+  email: "driver5@bayanisolutions.com",
     phone: "+62 840-3456-7819",
     baseSalary: 5000000,
     allowances: {
@@ -1186,7 +1186,7 @@ export const employees: Employee[] = [
     name: "Ni Kadek Sumiati",
     position: "Cleaning Supervisor",
     department: "Cleaning Service",
-    email: "cleaning1@enjoydive.com",
+  email: "cleaning1@bayanisolutions.com",
     phone: "+62 841-3456-7820",
     baseSalary: 4500000,
     allowances: {
@@ -1225,7 +1225,7 @@ export const employees: Employee[] = [
     name: "Made Sari Dewi",
     position: "Cleaning Staff",
     department: "Cleaning Service",
-    email: "cleaning2@enjoydive.com",
+  email: "cleaning2@bayanisolutions.com",
     phone: "+62 842-3456-7821",
     baseSalary: 4000000,
     allowances: {
@@ -1264,7 +1264,7 @@ export const employees: Employee[] = [
     name: "Ketut Widiastuti",
     position: "Cleaning Staff",
     department: "Cleaning Service",
-    email: "cleaning3@enjoydive.com",
+  email: "cleaning3@bayanisolutions.com",
     phone: "+62 843-3456-7822",
     baseSalary: 4000000,
     allowances: {

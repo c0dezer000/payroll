@@ -91,12 +91,13 @@ export interface PaySlip {
   overtimeHours?: number;
   proratedBase?: number;
   holidayType?:
-    | "idul_fitri"
-    | "natal"
-    | "nyepi"
-    | "waisak"
-    | "anniversary"
-    | null;
+  | "regular"
+  | "special_non_working"
+  | "special_working"
+  | "national"
+  | "local"
+  | "anniversary"
+  | null;
 }
 
 export interface DashboardStats {
@@ -151,9 +152,20 @@ export interface HolidayCalendar {
   id: string;
   name: string;
   date: string;
-  type: "idul_fitri" | "natal" | "nyepi" | "waisak" | "anniversary";
+  // Philippine-specific holiday categories. Keep anniversary for company events.
+  type:
+    | "regular"
+    | "special_non_working"
+    | "special_working"
+    | "national"
+    | "local"
+    | "anniversary";
   description: string;
   allowanceMultiplier: number; // multiplier for base salary
   isActive: boolean;
-  eligibleReligions: string[]; // agama yang berhak mendapat tunjangan
+  // Optional list of religions or groups eligible for a holiday allowance
+  eligibleReligions?: string[];
+  // Optional language-specific names (populated when hydrating from public APIs)
+  localName?: string;
+  englishName?: string;
 }
