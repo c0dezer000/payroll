@@ -16,6 +16,7 @@ import {
   getCurrentPeriod,
   getActiveHolidayForPeriod,
   getHolidayName,
+  type AttendancePeriod,
 } from "../utils/payroll";
 import { generatePDF } from "../utils/pdfGenerator";
 
@@ -23,6 +24,7 @@ const PaySlipGenerator: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod());
   const [overtimeHours, setOvertimeHours] = useState<number | null>(null);
+  const [attendancePeriod, setAttendancePeriod] = useState<AttendancePeriod | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,11 @@ const PaySlipGenerator: React.FC = () => {
 
   const employee = employees.find((emp) => emp.id === selectedEmployee);
   const payslip = employee
-    ? calculatePayroll(employee, selectedPeriod, overtimeHours ?? 0)
+    ? calculatePayroll(
+        employee,
+        selectedPeriod,
+        attendancePeriod ?? (overtimeHours !== null ? { overtimeHours } : null)
+      )
     : null;
   const activeHoliday = getActiveHolidayForPeriod(selectedPeriod);
 
@@ -76,11 +82,39 @@ const PaySlipGenerator: React.FC = () => {
         const data = await res.json();
         if (!mounted) return;
 
-        const totalOvertime = Array.isArray(data)
-          ? data.reduce((sum: number, rec: any) => sum + (Number(rec.overtimeHours) || 0), 0)
-          : 0;
+        const records = Array.isArray(data) ? data : [];
 
-        // Only set if > 0 to avoid showing stray 0; otherwise keep null
+        const totalOvertime = records.reduce((sum: number, rec: any) => sum + (Number(rec.overtimeHours) || 0), 0);
+
+        // Determine days present: records with status 'present' or hoursWorked > 0
+        const daysPresent = records.filter((rec: any) => rec.status === 'present' || (Number(rec.hoursWorked) || 0) > 0).length;
+
+        // Compute workDays in period (default: count weekdays Mon-Fri)
+        const countWorkDays = (s: Date, e: Date) => {
+          let d = new Date(s);
+          let count = 0;
+          while (d <= e) {
+            const day = d.getDay();
+            // 1..5 are Mon-Fri
+            if (day >= 1 && day <= 5) count++;
+            d.setDate(d.getDate() + 1);
+          }
+          return count;
+        };
+
+        const workDays = countWorkDays(start, end);
+
+        // Set attendance period state including overtime, daysPresent and workDays
+        const att: AttendancePeriod = {
+          workDays,
+          daysPresent,
+          overtimeHours: Math.round(totalOvertime * 100) / 100,
+          expectedHours: workDays * 8,
+        };
+
+        setAttendancePeriod(att);
+
+        // Only set overtimeHours state for UX if there's OT; otherwise keep null
         setOvertimeHours(totalOvertime > 0 ? Math.round(totalOvertime * 100) / 100 : null);
       } catch (err) {
         console.error('Error fetching attendance overtime', err);
@@ -473,6 +507,19 @@ const PaySlipGenerator: React.FC = () => {
                         {formatCurrency(payslip.deductions.insurance)}
                       </span>
                     </div>
+                    {/* Government mandatory deductions - always show here */}
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">SSS</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(payslip.deductions.sss)}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">PhilHealth</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(payslip.deductions.philHealth)}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">Pag-IBIG</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(payslip.deductions.pagIbig)}</span>
+                    </div>
                     {payslip.deductions.cooperativeFund > 0 && (
                       <div className="flex justify-between py-2">
                         <span className="text-slate-700 dark:text-slate-300 font-medium">
@@ -503,14 +550,6 @@ const PaySlipGenerator: React.FC = () => {
                         </span>
                       </div>
                     )}
-                    <div className="flex justify-between py-2 bg-red-100 dark:bg-red-800/30 px-3 rounded-lg">
-                      <span className="text-red-700 dark:text-red-300 font-medium">
-                        PPN (11%)
-                      </span>
-                      <span className="font-bold text-red-800 dark:text-red-200">
-                        {formatCurrency(payslip.deductions.ppn)}
-                      </span>
-                    </div>
                     {payslip.deductions.other > 0 && (
                       <div className="flex justify-between py-2">
                         <span className="text-slate-700 dark:text-slate-300 font-medium">

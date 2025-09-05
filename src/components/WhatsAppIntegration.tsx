@@ -87,7 +87,7 @@ const WhatsAppIntegration: React.FC = () => {
         )
       );
 
-      const payslip = calculatePayroll(employee, selectedPeriod);
+  const payslip = calculatePayroll(employee, selectedPeriod, null);
       const message = `🌊 *ENJOY DIVE PAYROLL*\n\nHello ${
         employee.name
       },\n\nYour pay slip for ${selectedPeriod} is ready!\n\n💰 Net Salary: ${formatCurrency(
@@ -247,7 +247,7 @@ const WhatsAppIntegration: React.FC = () => {
             const status = messageStatus.find(
               (s) => s.employeeId === employee.id
             );
-            const payslip = calculatePayroll(employee, selectedPeriod);
+            const payslip = calculatePayroll(employee, selectedPeriod, null);
 
             return (
               <div

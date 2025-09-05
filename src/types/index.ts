@@ -80,13 +80,16 @@ export interface PaySlip {
     cooperativeFund: number;
     healthInsurance: number;
     loanDeduction: number;
-    ppn: number;
+    sss: number;
+    philHealth: number;
+    pagIbig: number;
     total: number;
   };
   grossSalary: number;
   netSalary: number;
   generatedAt: string;
   overtimeHours?: number;
+  proratedBase?: number;
   holidayType?:
     | "idul_fitri"
     | "natal"

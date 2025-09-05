@@ -14,6 +14,7 @@ import {
 	formatCurrency,
 	getCurrentPeriod,
 	calculatePayroll,
+	type AttendancePeriod,
 } from "../utils/payroll";
 
 interface ProcessingStatus {
@@ -30,6 +31,7 @@ const PayrollProcessing: React.FC = () => {
 	const [completedProcessing, setCompletedProcessing] = useState(false);
 	const [employees, setEmployees] = useState<Employee[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendancePeriod | null>>({});
 
 	useEffect(() => {
 		let mounted = true;
@@ -50,10 +52,57 @@ const PayrollProcessing: React.FC = () => {
 		return () => { mounted = false };
 	}, []);
 
-	const totalPayroll = employees.reduce((sum, emp) => {
-		const payslip = calculatePayroll(emp, selectedPeriod);
-		return sum + payslip.netSalary;
-	}, 0);
+	// Fetch attendance for all employees when period or employees change
+	useEffect(() => {
+		let mounted = true;
+		if (employees.length === 0 || !selectedPeriod) return;
+		const fetchAllAttendance = async () => {
+			const [mStr, yStr] = selectedPeriod.split("/");
+			const monthNum = Number(mStr);
+			const yearNum = Number(yStr);
+			if (!monthNum || !yearNum) return;
+			const start = new Date(yearNum, monthNum - 1, 1);
+			const end = new Date(yearNum, monthNum, 0);
+			const workDaysCount = (s: Date, e: Date) => {
+				let d = new Date(s);
+				let count = 0;
+				while (d <= e) {
+					const day = d.getDay();
+					if (day >= 1 && day <= 5) count++;
+					d.setDate(d.getDate() + 1);
+				}
+				return count;
+			};
+			const wd = workDaysCount(start, end);
+			const map: Record<string, AttendancePeriod | null> = {};
+			for (const emp of employees) {
+				try {
+					const res = await fetch(`/api/attendance?employeeId=${encodeURIComponent(emp.id)}&start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}`);
+					if (!res.ok) { map[emp.id] = null; continue; }
+					const data = await res.json();
+					const records = Array.isArray(data) ? data : [];
+					const totalOvertime = records.reduce((s: number, r: any) => s + (Number(r.overtimeHours) || 0), 0);
+					const daysPresent = records.filter((r: any) => r.status === 'present' || (Number(r.hoursWorked) || 0) > 0).length;
+					map[emp.id] = {
+						workDays: wd,
+						daysPresent,
+						overtimeHours: Math.round(totalOvertime * 100) / 100,
+						expectedHours: wd * 8,
+					};
+				} catch (err) {
+					console.error('Error fetching attendance for', emp.id, err);
+					map[emp.id] = null;
+				}
+			}
+			if (mounted) setAttendanceMap(map);
+		};
+		fetchAllAttendance();
+		return () => { mounted = false };
+	}, [employees, selectedPeriod]);
+
+		// totalPayroll is computed only during processing and stored in state
+		const [computedPayrolls, setComputedPayrolls] = useState<Record<string, { netSalary: number; payslip: any }>>({});
+		const [computedTotalPayroll, setComputedTotalPayroll] = useState<number>(0);
 
 	const completedCount = processingStatus.filter((s) => s.status === "completed").length;
 	const overallProgress = employees.length > 0 ? (completedCount / employees.length) * 100 : 0;
@@ -61,14 +110,60 @@ const PayrollProcessing: React.FC = () => {
 	const startProcessing = async () => {
 		setIsProcessing(true);
 		setCompletedProcessing(false);
+		setComputedPayrolls({});
+		setComputedTotalPayroll(0);
+
 		const initialStatus = employees.map((emp) => ({
 			employeeId: emp.id,
 			status: "pending" as const,
 			progress: 0,
 		}));
 		setProcessingStatus(initialStatus);
+
+		// determine period start/end
+		const [mStr, yStr] = selectedPeriod.split("/");
+		const monthNum = Number(mStr);
+		const yearNum = Number(yStr);
+		const start = new Date(yearNum, monthNum - 1, 1);
+		const end = new Date(yearNum, monthNum, 0);
+
+		const fetchAttendanceFor = async (empId: string) => {
+			try {
+				const res = await fetch(`/api/attendance?employeeId=${encodeURIComponent(empId)}&start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}`);
+				if (!res.ok) return null;
+				const data = await res.json();
+				const records = Array.isArray(data) ? data : [];
+				const totalOvertime = records.reduce((s: number, r: any) => s + (Number(r.overtimeHours) || 0), 0);
+				const daysPresent = records.filter((r: any) => r.status === 'present' || (Number(r.hoursWorked) || 0) > 0).length;
+
+				const workDaysCount = (s: Date, e: Date) => {
+					let d = new Date(s);
+					let count = 0;
+					while (d <= e) {
+						const day = d.getDay();
+						if (day >= 1 && day <= 5) count++;
+						d.setDate(d.getDate() + 1);
+					}
+					return count;
+				};
+				const wd = workDaysCount(start, end);
+
+				return {
+					workDays: wd,
+					daysPresent,
+					overtimeHours: Math.round(totalOvertime * 100) / 100,
+					expectedHours: wd * 8,
+				} as AttendancePeriod;
+			} catch (err) {
+				console.error('Error fetching attendance for', empId, err);
+				return null;
+			}
+		};
+
+		const newComputed: Record<string, { netSalary: number; payslip: any }> = {};
 		for (let i = 0; i < employees.length; i++) {
 			const employee = employees[i];
+
 			setProcessingStatus((prev) =>
 				prev.map((status) =>
 					status.employeeId === employee.id
@@ -76,7 +171,14 @@ const PayrollProcessing: React.FC = () => {
 						: status
 				)
 			);
-			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			const attendance = await fetchAttendanceFor(employee.id);
+
+			const payslip = calculatePayroll(employee, selectedPeriod, attendance ?? null);
+			newComputed[employee.id] = { netSalary: payslip.netSalary, payslip };
+
+			// small delay to keep UI responsive
+			await new Promise((resolve) => setTimeout(resolve, 150));
 			setProcessingStatus((prev) =>
 				prev.map((status) =>
 					status.employeeId === employee.id
@@ -84,7 +186,7 @@ const PayrollProcessing: React.FC = () => {
 						: status
 				)
 			);
-			await new Promise((resolve) => setTimeout(resolve, 100));
+
 			setProcessingStatus((prev) =>
 				prev.map((status) =>
 					status.employeeId === employee.id
@@ -93,6 +195,11 @@ const PayrollProcessing: React.FC = () => {
 				)
 			);
 		}
+
+		setComputedPayrolls(newComputed);
+		const total = Object.values(newComputed).reduce((s, v) => s + (v?.netSalary || 0), 0);
+		setComputedTotalPayroll(Math.round(total * 100) / 100);
+
 		setIsProcessing(false);
 		setCompletedProcessing(true);
 	};
@@ -167,7 +274,7 @@ const PayrollProcessing: React.FC = () => {
 						<div className="flex items-center justify-between">
 							<div>
 								<p className="text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-2">Total Payroll</p>
-								<p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(totalPayroll)}</p>
+								<p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{completedProcessing ? formatCurrency(computedTotalPayroll) : '—'}</p>
 							</div>
 							<DollarSign className="h-8 w-8 text-emerald-500" />
 						</div>
@@ -191,7 +298,7 @@ const PayrollProcessing: React.FC = () => {
 						<div className="flex items-center justify-between">
 							<div>
 								<p className="text-amber-600 dark:text-amber-400 text-sm font-medium mb-2">Avg. Salary</p>
-								<p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(Math.round(totalPayroll / employees.length))}</p>
+								<p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{completedProcessing && employees.length > 0 ? formatCurrency(Math.round(computedTotalPayroll / employees.length)) : '—'}</p>
 							</div>
 							<TrendingUp className="h-8 w-8 text-amber-500" />
 						</div>
@@ -240,7 +347,7 @@ const PayrollProcessing: React.FC = () => {
 											{status.status === "processing" && (<div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-500 border-t-transparent"></div>)}
 											{status.status === "error" && (<AlertCircle className="h-6 w-6 text-red-500" />)}
 											{status.status === "pending" && (<Clock className="h-6 w-6 text-slate-400" />)}
-											<span className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(calculatePayroll(employee, selectedPeriod).netSalary)}</span>
+											<span className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(calculatePayroll(employee, selectedPeriod, attendanceMap[employee.id] ?? null).netSalary)}</span>
 										</div>
 									</div>
 									{status.status !== "pending" && (

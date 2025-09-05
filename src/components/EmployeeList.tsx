@@ -82,17 +82,88 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<Employee>(employee ?? emptyEmployee());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   React.useEffect(() => {
     setFormData(employee ?? emptyEmployee());
+  setValidationErrors({});
   }, [employee, isOpen]);
 
   if (!isOpen) return null;
 
   const title = mode === "view" ? "Employee Details" : mode === "edit" ? "Edit Employee" : "Add New Employee";
 
+  // Validation helpers for SSS / PhilHealth / Pag-IBIG
+  const sssRegex = /^(\d{2}-\d{7}-\d{1}|\d{10})$/;
+  const philHealthRegex = /^(\d{2}-\d{9}-\d{1}|\d{12})$/;
+  const pagIbigRegex = /^(\d{4}-\d{4}-\d{4}|\d{12})$/;
+
+  const isNA = (v?: string) => !!v && v.trim().toLowerCase() === "n/a";
+  const validateField = (key: string, val?: string) => {
+    if (!val || val.trim() === "") return `${key} is required`;
+    if (isNA(val)) return "";
+    if (key === "SSS") return sssRegex.test(val.trim()) ? "" : "Invalid SSS format";
+    if (key === "PhilHealth") return philHealthRegex.test(val.trim()) ? "" : "Invalid PhilHealth format";
+    if (key === "Pag-IBIG") return pagIbigRegex.test(val.trim()) ? "" : "Invalid Pag-IBIG format";
+    return "";
+  };
+
+  // Auto-format helpers: strip non-digits, accept "n/a", and insert dashes
+  const toNA = (v?: string) => (v && v.trim().toLowerCase() === 'n/a' ? 'n/a' : null);
+  const formatSSS = (v?: string) => {
+    if (!v) return '';
+    const na = toNA(v);
+    if (na) return na;
+    const digits = v.replace(/\D/g, '').slice(0, 10);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 9) return `${digits.slice(0,2)}-${digits.slice(2)}`;
+    return `${digits.slice(0,2)}-${digits.slice(2,9)}-${digits.slice(9)}`;
+  };
+
+  const formatPhilHealth = (v?: string) => {
+    if (!v) return '';
+    const na = toNA(v);
+    if (na) return na;
+    const digits = v.replace(/\D/g, '').slice(0, 12);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 11) return `${digits.slice(0,2)}-${digits.slice(2)}`;
+    return `${digits.slice(0,2)}-${digits.slice(2,11)}-${digits.slice(11)}`;
+  };
+
+  const formatPagIbig = (v?: string) => {
+    if (!v) return '';
+    const na = toNA(v);
+    if (na) return na;
+    const digits = v.replace(/\D/g, '').slice(0, 12);
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 8) return `${digits.slice(0,4)}-${digits.slice(4)}`;
+    return `${digits.slice(0,4)}-${digits.slice(4,8)}-${digits.slice(8)}`;
+  };
+
+  const formatTIN = (v?: string) => {
+    if (!v) return '';
+    const na = toNA(v);
+    if (na) return na;
+    const digits = v.replace(/\D/g, '').slice(0, 12);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0,3)}-${digits.slice(3)}`;
+    if (digits.length <= 9) return `${digits.slice(0,3)}-${digits.slice(3,6)}-${digits.slice(6)}`;
+    return `${digits.slice(0,3)}-${digits.slice(3,6)}-${digits.slice(6,9)}-${digits.slice(9)}`;
+  };
+
   const handleSave = () => {
-    onSave(formData);
+    const errs: Record<string, string> = {};
+    const sssErr = validateField("SSS", formData.sssNumber);
+    if (sssErr) errs.sssNumber = sssErr;
+    const philErr = validateField("PhilHealth", formData.philHealthNumber);
+    if (philErr) errs.philHealthNumber = philErr;
+    const pagErr = validateField("Pag-IBIG", formData.pagIbigNumber);
+    if (pagErr) errs.pagIbigNumber = pagErr;
+
+    setValidationErrors(errs);
+    if (Object.keys(errs).length === 0) {
+      onSave(formData);
+    }
   };
 
   const handleDelete = () => {
@@ -464,10 +535,13 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
                         type="text"
                         required
                         value={formData.sssNumber}
-                        onChange={(e) => setFormData({ ...formData, sssNumber: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, sssNumber: formatSSS(e.target.value) })}
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                        placeholder="XX-XXXXXXX-X"
+                        placeholder="XX-XXXXXXX-X or n/a"
                       />
+                    )}
+                    {validationErrors.sssNumber && (
+                      <p className="text-sm text-red-600 mt-2">{validationErrors.sssNumber}</p>
                     )}
                   </div>
 
@@ -481,10 +555,13 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
                         type="text"
                         required
                         value={formData.philHealthNumber}
-                        onChange={(e) => setFormData({ ...formData, philHealthNumber: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, philHealthNumber: formatPhilHealth(e.target.value) })}
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                        placeholder="XX-XXXXXXXXX-X"
+                        placeholder="XX-XXXXXXXXX-X or n/a"
                       />
+                    )}
+                    {validationErrors.philHealthNumber && (
+                      <p className="text-sm text-red-600 mt-2">{validationErrors.philHealthNumber}</p>
                     )}
                   </div>
 
@@ -498,10 +575,13 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
                         type="text"
                         required
                         value={formData.pagIbigNumber}
-                        onChange={(e) => setFormData({ ...formData, pagIbigNumber: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, pagIbigNumber: formatPagIbig(e.target.value) })}
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                        placeholder="XXXX-XXXX-XXXX"
+                        placeholder="XXXX-XXXX-XXXX or n/a"
                       />
+                    )}
+                    {validationErrors.pagIbigNumber && (
+                      <p className="text-sm text-red-600 mt-2">{validationErrors.pagIbigNumber}</p>
                     )}
                   </div>
 
@@ -515,7 +595,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
                         type="text"
                         required
                         value={formData.tin}
-                        onChange={(e) => setFormData({ ...formData, tin: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, tin: formatTIN(e.target.value) })}
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                         placeholder="XXX-XXX-XXX-XXX"
                       />

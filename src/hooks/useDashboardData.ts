@@ -20,7 +20,7 @@ export const useDashboardData = () => {
         const activeEmployees = employees.filter((emp) => emp.status === "active").length;
 
         const totalPayroll = employees.reduce((sum, emp) => {
-          const payslip = calculatePayroll(emp, getCurrentPeriod());
+          const payslip = calculatePayroll(emp, getCurrentPeriod(), null);
           return sum + payslip.netSalary;
         }, 0);
 
@@ -44,7 +44,7 @@ export const useDashboardData = () => {
           if (i > 6) monthlyEmployees -= Math.floor(Math.random() * 2);
 
           employees.slice(0, monthlyEmployees).forEach((emp) => {
-            const empPayroll = calculatePayroll(emp, period);
+            const empPayroll = calculatePayroll(emp, period, null);
             monthlyPayroll += empPayroll.netSalary;
           });
 
@@ -61,7 +61,7 @@ export const useDashboardData = () => {
           const processedDate = new Date(date.getFullYear(), date.getMonth(), 25);
 
           const periodPayroll = employees.reduce((sum, emp) => {
-            const payslip = calculatePayroll(emp, period);
+            const payslip = calculatePayroll(emp, period, null);
             return sum + payslip.netSalary;
           }, 0);
 

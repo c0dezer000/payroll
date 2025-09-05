@@ -147,13 +147,28 @@ export const calculateTipsDistribution = (): number => {
   return Math.round(totalTips / eligibleEmployeeCount);
 };
 
+export interface AttendancePeriod {
+  workDays?: number; // total work days in period
+  daysPresent?: number; // attended days
+  expectedHours?: number; // expected work hours in period (for hourly prorate)
+  hoursWorked?: number; // actual hours worked
+  overtimeHours?: number; // overtime hours in period
+}
+
 export const calculatePayroll = (
   employee: Employee,
   period: string,
-  overtimeHours: number = 0
+  attendance: AttendancePeriod | null = null
 ): PaySlip => {
-  // Calculate overtime pay
-  const overtimePay = overtimeHours * (employee.overtimeRate || 0);
+  // Determine overtime hours from attendance fallback to 0
+  const overtimeHours = attendance?.overtimeHours ?? 0;
+
+  // Calculate overtime pay: use explicit overtimeRate or derive from base salary
+  // derive base hourly from expectedHours if provided, otherwise assume 160 hours/month
+  const expectedHours = attendance?.expectedHours ?? 160;
+  const baseHourly = expectedHours > 0 ? employee.baseSalary / expectedHours : 0;
+  const overtimeRate = employee.overtimeRate || baseHourly * 1.25;
+  const overtimePay = Math.max(0, overtimeHours) * overtimeRate;
 
   // Calculate holiday allowance
   const { amount: holidayAllowanceAmount, type: holidayType } =
@@ -179,7 +194,7 @@ export const calculatePayroll = (
     }
   }
 
-  // Calculate total allowances
+  // Calculate total allowances (overtime included)
   const allowancesTotal =
     ((employee.allowances?.transport as number) || 0) +
     ((employee.allowances?.meal as number) || 0) +
@@ -188,13 +203,52 @@ export const calculatePayroll = (
     holidayAllowanceAmount +
     overtimePay;
 
+  // Prorate base salary by attendance if attendance provided (days-based)
+  let proratedBase = employee.baseSalary;
+  if (attendance && typeof attendance.workDays === "number" && typeof attendance.daysPresent === "number") {
+    const wd = Math.max(1, attendance.workDays);
+    const dp = Math.max(0, Math.min(wd, attendance.daysPresent));
+    proratedBase = (employee.baseSalary * dp) / wd;
+  }
+
   // Calculate gross salary (before PPN)
-  const grossSalaryBeforePPN = employee.baseSalary + allowancesTotal;
+  const grossSalaryBeforePPN = proratedBase + allowancesTotal;
 
-  // Calculate PPN 11%
-  const ppnAmount = grossSalaryBeforePPN * 0.11;
+  // No PPN for Philippines
+  const ppnAmount = 0;
 
-  // Calculate total deductions (including PPN)
+  // Government mandatory deductions (Philippines, 2025 rates)
+  // SSS: 4.5% employee share, up to max salary credit of PHP 30,000
+  // PhilHealth: 5% (split employee/employer, assume 2.5% employee), up to PHP 10,000 monthly premium
+  // Pag-IBIG: 2% employee share, up to PHP 100 monthly
+  let sssDeduction = 0;
+  let philHealthDeduction = 0;
+  let pagIbigDeduction = 0;
+  // Validation helpers: accept either dashed format or digits-only
+  const sssRegex = /^(\d{2}-\d{7}-\d{1}|\d{10})$/;
+  const philHealthRegex = /^(\d{2}-\d{9}-\d{1}|\d{12})$/;
+  const pagIbigRegex = /^(\d{4}-\d{4}-\d{4}|\d{12})$/;
+
+  const isValidSSS = (val?: string) => !!val && sssRegex.test(val.trim());
+  const isValidPhilHealth = (val?: string) => !!val && philHealthRegex.test(val.trim());
+  const isValidPagIbig = (val?: string) => !!val && pagIbigRegex.test(val.trim());
+
+  // SSS
+  if (isValidSSS(employee.sssNumber)) {
+    const sssBase = Math.min(grossSalaryBeforePPN, 30000);
+    sssDeduction = sssBase * 0.045;
+  }
+  // PhilHealth
+  if (isValidPhilHealth(employee.philHealthNumber)) {
+    const philHealthBase = Math.min(grossSalaryBeforePPN, 200000); // 5% of salary, but max monthly premium is 10,000 (5% of 200,000)
+    philHealthDeduction = Math.min(philHealthBase * 0.025, 10000);
+  }
+  // Pag-IBIG
+  if (isValidPagIbig(employee.pagIbigNumber)) {
+    pagIbigDeduction = Math.min(grossSalaryBeforePPN * 0.02, 100);
+  }
+
+  // Calculate total deductions (Philippines: no PPN)
   const deductionsTotal =
     ((employee.deductions?.tax as number) || 0) +
     ((employee.deductions?.insurance as number) || 0) +
@@ -202,7 +256,9 @@ export const calculatePayroll = (
     ((employee.deductions?.cooperativeFund as number) || 0) +
     ((employee.deductions?.healthInsurance as number) || 0) +
     ((employee.deductions?.loanDeduction as number) || 0) +
-    ppnAmount;
+    sssDeduction +
+    philHealthDeduction +
+    pagIbigDeduction;
 
   // Final calculations
   const grossSalary = grossSalaryBeforePPN;
@@ -213,7 +269,8 @@ export const calculatePayroll = (
     employeeId: employee.id,
     employee,
     period,
-    baseSalary: employee.baseSalary,
+  baseSalary: employee.baseSalary,
+  proratedBase,
     allowances: {
       transport: ((employee.allowances?.transport as number) || 0),
       meal: ((employee.allowances?.meal as number) || 0),
@@ -230,13 +287,15 @@ export const calculatePayroll = (
       cooperativeFund: ((employee.deductions?.cooperativeFund as number) || 0),
       healthInsurance: ((employee.deductions?.healthInsurance as number) || 0),
       loanDeduction: ((employee.deductions?.loanDeduction as number) || 0),
-      ppn: ppnAmount,
+      sss: sssDeduction,
+      philHealth: philHealthDeduction,
+      pagIbig: pagIbigDeduction,
       total: deductionsTotal,
     },
     grossSalary,
     netSalary,
     generatedAt: new Date().toISOString(),
-    overtimeHours,
+  overtimeHours,
     holidayType: holidayType as any,
   };
 };

@@ -226,7 +226,10 @@ export const generatePDF = async (payslip: PaySlip): Promise<void> => {
       ]);
     }
 
-    deductions.push(["PPN (11%)", formatCurrency(payslip.deductions.ppn)]);
+  // Government mandatory deductions for Philippines - always show rows
+  deductions.push(["SSS", formatCurrency(payslip.deductions.sss)]);
+  deductions.push(["PhilHealth", formatCurrency(payslip.deductions.philHealth)]);
+  deductions.push(["Pag-IBIG", formatCurrency(payslip.deductions.pagIbig)]);
 
     if (payslip.deductions.other > 0) {
       deductions.push(["Other", formatCurrency(payslip.deductions.other)]);
