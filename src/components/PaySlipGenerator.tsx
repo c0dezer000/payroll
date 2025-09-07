@@ -7,6 +7,7 @@ import {
   MapPin,
   Clock,
   Gift,
+  MessageSquare,
 } from "lucide-react";
 import type { Employee } from "../types";
 import {
@@ -18,6 +19,7 @@ import {
   getHolidayName,
   type AttendancePeriod,
 } from "../utils/payroll";
+import { getCachedHolidaysForYear } from "../utils/holidays";
 import { generatePDF } from "../utils/pdfGenerator";
 
 const PaySlipGenerator: React.FC = () => {
@@ -89,8 +91,8 @@ const PaySlipGenerator: React.FC = () => {
         // Determine days present: records with status 'present' or hoursWorked > 0
         const daysPresent = records.filter((rec: any) => rec.status === 'present' || (Number(rec.hoursWorked) || 0) > 0).length;
 
-        // Compute workDays in period (default: count weekdays Mon-Fri)
-        const countWorkDays = (s: Date, e: Date) => {
+        // Compute workDays in period: count weekdays Mon-Fri then subtract non-working holidays
+        const countWorkDays = (s: Date, e: Date, holidaysForYear: any[] = []) => {
           let d = new Date(s);
           let count = 0;
           while (d <= e) {
@@ -99,10 +101,28 @@ const PaySlipGenerator: React.FC = () => {
             if (day >= 1 && day <= 5) count++;
             d.setDate(d.getDate() + 1);
           }
+
+          // Subtract holidays that fall on weekdays and are non-working (exclude 'special_working')
+          try {
+            const holidayCount = (holidaysForYear || []).filter((h: any) => {
+              if (!h || !h.date) return false;
+              if (h.isActive === false) return false;
+              // treat 'special_working' as still a work day
+              if (h.type === "special_working") return false;
+              const hd = new Date(h.date);
+              return hd >= s && hd <= e && hd.getDay() >= 1 && hd.getDay() <= 5;
+            }).length;
+
+            count = Math.max(0, count - holidayCount);
+          } catch (err) {
+            // if anything goes wrong, keep original count
+          }
+
           return count;
         };
 
-        const workDays = countWorkDays(start, end);
+        const cachedHolidays = getCachedHolidaysForYear(yearNum);
+        const workDays = countWorkDays(start, end, cachedHolidays);
 
         // Set attendance period state including overtime, daysPresent and workDays
         const att: AttendancePeriod = {
@@ -141,16 +161,36 @@ const PaySlipGenerator: React.FC = () => {
   const handleSendWhatsApp = () => {
     if (!employee || !payslip) return;
 
-  const message = `💼 *BAYANI PAYROLL*\n\nHello ${
-      employee.name
-    },\n\nYour pay slip for ${selectedPeriod} is ready!\n\n💰 Net Salary: ${formatCurrency(
-      payslip.netSalary
-  )}\n\nThank you for your dedication to Bayani Solutions! �🇭`;
-       const phone = employee.phone || "";
-       const whatsappUrl = `https://wa.me/${phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-         message
-       )}`;
-    window.open(whatsappUrl, "_blank");
+  // Default behavior preserved for quick-send, but we'll also support an editable panel below
+  // (the panel UI is implemented separately and toggled via state)
+  const message = `💼 *BAYANI PAYROLL*\n\nHello ${employee.name},\n\nYour pay slip for ${selectedPeriod} is ready!\n\n💰 Net Salary: ${formatCurrency(
+    payslip.netSalary
+  )}\n\nThank you for your dedication to Bayani Solutions!`;
+  const phone = employee.phone || "";
+  const whatsappUrl = `https://wa.me/${phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+    message
+  )}`;
+  window.open(whatsappUrl, "_blank");
+  };
+
+  // Payslip-specific WhatsApp panel state (separate from the bulk WhatsApp integration)
+  const [showWhatsAppPanel, setShowWhatsAppPanel] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [waMessage, setWaMessage] = useState("");
+
+  useEffect(() => {
+    if (!employee || !payslip) return;
+    const defaultMsg = `💼 *BAYANI PAYROLL*\n\nHello ${employee.name},\n\nYour pay slip for ${selectedPeriod} is ready!\n\n💰 Net Salary: ${formatCurrency(payslip.netSalary)}\n\nThank you for your dedication to Bayani Solutions!`;
+    setWaPhone(employee.phone || "");
+    setWaMessage(defaultMsg);
+  }, [employee, payslip, selectedPeriod]);
+
+  const handleSendWhatsAppFromPanel = () => {
+    if (!waPhone || !waMessage) return;
+    const phoneSanitized = waPhone.replace(/[^0-9]/g, "");
+    const url = `https://wa.me/${phoneSanitized}?text=${encodeURIComponent(waMessage)}`;
+    window.open(url, "_blank");
+    setShowWhatsAppPanel(false);
   };
 
   return (
@@ -618,12 +658,64 @@ const PaySlipGenerator: React.FC = () => {
                 <span>{isGenerating ? "Generating..." : "Download PDF"}</span>
               </button>
               <button
-                onClick={handleSendWhatsApp}
+                onClick={() => setShowWhatsAppPanel(true)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2"
               >
                 <Send className="h-4 w-4" />
                 <span>Send WhatsApp</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payslip-specific WhatsApp Panel (not the bulk integration) */}
+      {showWhatsAppPanel && employee && payslip && (
+        <div className="fixed right-6 bottom-6 w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6 z-50">
+          <div className="flex items-start justify-between">
+            <div>
+              <h4 className="text-lg font-bold text-slate-900 dark:text-white">Send Pay Slip via WhatsApp</h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Edit message or phone before sending.</p>
+            </div>
+            <button onClick={() => setShowWhatsAppPanel(false)} className="text-slate-500 hover:text-slate-700 ml-4">✕</button>
+          </div>
+
+          {/* Message Preview - matches WhatsAppIntegration design */}
+          <div className="mt-4">
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl max-w-full border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center space-x-3 mb-2">
+                <MessageSquare className="h-5 w-5 text-emerald-600" />
+                <span className="font-semibold text-emerald-800 dark:text-emerald-400">WhatsApp Message</span>
+              </div>
+              <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+                💼 <strong>BAYANI PAYROLL</strong>
+                {"\n\n"}Hello {employee.name},
+                {"\n\n"}Your pay slip for {selectedPeriod} is ready!
+                {"\n\n"}💰 Net Salary: {formatCurrency(payslip.netSalary)}
+                {"\n\n"}Thank you for your dedication to Bayani Solutions!
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <label className="text-sm text-slate-600 dark:text-slate-300">Phone</label>
+            <input
+              value={waPhone}
+              onChange={(e) => setWaPhone(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
+
+            <label className="text-sm text-slate-600 dark:text-slate-300">Message</label>
+            <textarea
+              value={waMessage}
+              onChange={(e) => setWaMessage(e.target.value)}
+              rows={4}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
+            />
+
+            <div className="flex justify-end space-x-3">
+              <button onClick={() => setShowWhatsAppPanel(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600">Cancel</button>
+              <button onClick={handleSendWhatsAppFromPanel} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg">Send</button>
             </div>
           </div>
         </div>

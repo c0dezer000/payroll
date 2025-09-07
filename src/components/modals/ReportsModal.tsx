@@ -9,9 +9,10 @@ import {
 } from "lucide-react";
 // ...existing imports
 import { type DashboardStats, type ReportData } from "../../types";
-import { formatCurrency, formatDate } from "../../utils/payroll";
+import { formatCurrency, formatDate, calculatePayroll } from "../../utils/payroll";
 import { generateReportPDF } from "../../utils/reportGenerator";
 import type { Employee } from "../../types";
+import { getCachedHolidaysForYear } from "../../utils/holidays";
 
   
 
@@ -36,6 +37,8 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [reportPreview, setReportPreview] = useState<any | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const mountedRef = useRef(true);
 
   const fetchEmployees = useCallback(async () => {
@@ -73,34 +76,127 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
     };
   }, [fetchEmployees]);
 
-  const generateReportData = (): any => {
+  // Build report data using attendance-aware payroll calculations when possible
+  const buildReportData = async () => {
     const period = selectedPeriod;
-    // Calculate department breakdown
-  const departmentBreakdown = Object.entries(dashboardStats.departmentStats)
-      .map(([department, employeeCount]) => {
-    const deptEmployees = employees.filter((emp) => emp.department === department);
-        const totalSalary = deptEmployees.reduce((sum, emp) => {
-          const allowances =
-            (emp.allowances?.transport || 0) +
-            (emp.allowances?.meal || 0) +
-            (emp.allowances?.bonus || 0);
-          const deductions =
-            (emp.deductions?.tax || 0) +
-            (emp.deductions?.insurance || 0) +
-            (emp.deductions?.other || 0);
-          return sum + (emp.baseSalary + allowances - deductions);
-        }, 0);
+    const isMonthly = reportType === "monthly";
 
+    // parse period for monthly start/end
+    let start: Date | null = null;
+    let end: Date | null = null;
+    if (isMonthly) {
+      const [mStr, yStr] = period.split("/");
+      const monthNum = Number(mStr);
+      const yearNum = Number(yStr);
+      if (!monthNum || !yearNum) {
+        // fallback to current month
+        const now = new Date();
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      } else {
+        start = new Date(yearNum, monthNum - 1, 1);
+        end = new Date(yearNum, monthNum, 0);
+      }
+    }
+
+    // Helper: count work days excluding non-working holidays
+    const countWorkDays = (s: Date, e: Date, holidaysForYear: any[] = []) => {
+      let d = new Date(s);
+      let count = 0;
+      while (d <= e) {
+        const day = d.getDay();
+        if (day >= 1 && day <= 5) count++;
+        d.setDate(d.getDate() + 1);
+      }
+
+      try {
+        const holidayCount = (holidaysForYear || []).filter((h: any) => {
+          if (!h || !h.date) return false;
+          if (h.isActive === false) return false;
+          if (h.type === "special_working") return false;
+          const hd = new Date(h.date);
+          return hd >= s && hd <= e && hd.getDay() >= 1 && hd.getDay() <= 5;
+        }).length;
+
+        count = Math.max(0, count - holidayCount);
+      } catch (err) {}
+
+      return count;
+    };
+
+    const holidays = start ? getCachedHolidaysForYear(start.getFullYear()) : [];
+
+    const rows: any[] = [];
+    let totalPayroll = 0;
+
+    // Build per-employee rows in parallel
+    await Promise.all(
+      employees.map(async (emp) => {
+        let attendance: any = null;
+
+        if (isMonthly && start && end) {
+          try {
+            const res = await fetch(
+              `/api/attendance?employeeId=${encodeURIComponent(emp.id)}&start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}`
+            );
+            if (res.ok) {
+              const recs = await res.json();
+              const records = Array.isArray(recs) ? recs : [];
+
+              const totalOvertime = records.reduce((sum: number, rec: any) => sum + (Number(rec.overtimeHours) || 0), 0);
+              const daysPresent = records.filter((rec: any) => rec.status === 'present' || (Number(rec.hoursWorked) || 0) > 0).length;
+              const workDays = countWorkDays(start!, end!, holidays);
+
+              attendance = {
+                workDays,
+                daysPresent,
+                overtimeHours: Math.round(totalOvertime * 100) / 100,
+                expectedHours: workDays * 8,
+              };
+            }
+          } catch (err) {
+            // ignore and use null attendance
+          }
+        }
+
+        const payslip = calculatePayroll(emp, period, attendance);
+
+        const allowancesTotal = payslip.allowances.total || 0;
+        const deductionsTotal = payslip.deductions.total || 0;
+
+        rows.push({
+          id: emp.id,
+          name: emp.name,
+          department: emp.department || "-",
+          position: emp.position || "-",
+          baseSalary: payslip.baseSalary || 0,
+          proratedBase: payslip.proratedBase || 0,
+          allowancesTotal,
+          deductionsTotal,
+          gross: payslip.grossSalary || 0,
+          net: payslip.netSalary || 0,
+          raw: emp,
+        });
+
+        totalPayroll += payslip.netSalary || 0;
+      })
+    );
+
+    // Department breakdown
+    const departmentBreakdown = Object.entries(dashboardStats.departmentStats)
+      .map(([department, employeeCount]) => {
+        const deptRows = rows.filter((r) => r.department === department);
+        const totalSalary = deptRows.reduce((s, r) => s + (r.net || 0), 0);
         return {
           department,
           employeeCount,
           totalSalary,
-          averageSalary: totalSalary / employeeCount,
+          averageSalary: employeeCount > 0 ? totalSalary / employeeCount : 0,
         };
       })
       .sort((a, b) => b.totalSalary - a.totalSalary);
 
-    // Calculate salary distribution
+    // Salary distribution based on net
     const salaryRanges = [
       { range: "< 5M", min: 0, max: 5000000 },
       { range: "5M - 10M", min: 5000000, max: 10000000 },
@@ -109,99 +205,40 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
       { range: "> 25M", min: 25000000, max: Infinity },
     ];
 
-  const salaryDistribution = salaryRanges.map(({ range, min, max }) => {
-  const count = employees.filter((emp) => {
-        const netSalary =
-          emp.baseSalary +
-          (emp.allowances?.transport || 0) +
-          (emp.allowances?.meal || 0) +
-          (emp.allowances?.bonus || 0) -
-          (emp.deductions?.tax || 0) -
-          (emp.deductions?.insurance || 0) -
-          (emp.deductions?.other || 0);
-        return netSalary >= min && netSalary < max;
+    const salaryDistribution = salaryRanges.map(({ range, min, max }) => {
+      const count = rows.filter((r) => {
+        const val = r.net || 0;
+        return val >= min && val < max;
       }).length;
-
       return {
         range,
         count,
-        percentage: (count / employees.length) * 100,
+        percentage: employees.length > 0 ? (count / employees.length) * 100 : 0,
       };
     });
 
-    // Build per-employee computed rows (net pay primary)
-  const rows = employees.map((emp) => {
-    const allowancesTotal =
-      (emp.allowances?.transport || 0) +
-      (emp.allowances?.meal || 0) +
-      (emp.allowances?.bonus || 0) +
-      (emp.allowances?.overtime || 0) +
-      (emp.allowances?.tips || 0) +
-      (emp.allowances?.holidayAllowance || 0);
-
-    const deductionsTotal =
-      (emp.deductions?.tax || 0) +
-      (emp.deductions?.insurance || 0) +
-      (emp.deductions?.other || 0) +
-      (emp.deductions?.cooperativeFund || 0) +
-      (emp.deductions?.healthInsurance || 0) +
-      (emp.deductions?.loanDeduction || 0) +
-      (emp.deductions?.ppn || 0);
-
-    const gross = emp.baseSalary + allowancesTotal;
-    const net = gross - deductionsTotal;
-
-    return {
-      id: emp.id,
-      name: emp.name,
-      department: emp.department || "-",
-      position: emp.position || "-",
-      baseSalary: emp.baseSalary || 0,
-      allowancesTotal,
-      deductionsTotal,
-      gross,
-      net,
-      raw: emp,
-    };
-  });
-
-  // Get top earners (by net pay)
-  const topEarners = rows
-      .map((emp) => ({
-        name: emp.name,
-        position: emp.position,
-        department: emp.department,
-        salary: emp.net,
-      }))
+    const topEarners = rows
+      .map((r) => ({ name: r.name, position: r.position, department: r.department, salary: r.net }))
       .sort((a, b) => b.salary - a.salary)
       .slice(0, 10);
 
-    // Generate trends data
     const trends = dashboardStats.monthlyTrend
       .slice(-6)
       .map((item, index, arr) => {
-        const growth =
-          index > 0
-            ? ((item.amount - arr[index - 1].amount) / arr[index - 1].amount) *
-              100
-            : 0;
-        return {
-          period: item.month,
-          amount: item.amount,
-          growth,
-        };
+        const growth = index > 0 && arr[index - 1].amount > 0 ? ((item.amount - arr[index - 1].amount) / arr[index - 1].amount) * 100 : 0;
+        return { period: item.month, amount: item.amount, growth };
       });
 
-  return {
-      period: period,
+    return {
+      period,
       type: reportType,
-      totalPayroll: dashboardStats.totalPayroll,
-      totalEmployees: dashboardStats.totalEmployees,
+      totalPayroll,
+      totalEmployees: employees.length,
       departmentBreakdown,
       salaryDistribution,
       trends,
-  topEarners,
-  rows,
+      topEarners,
+      rows,
       generatedAt: new Date().toISOString(),
     };
   };
@@ -209,8 +246,8 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
   const handleDownloadReport = async () => {
     setIsGenerating(true);
     try {
-      const reportData = generateReportData();
-      await generateReportPDF(reportData);
+      const data = reportPreview || (await buildReportData());
+      await generateReportPDF(data);
     } catch (error) {
       console.error("Error generating report:", error);
     } finally {
@@ -218,7 +255,27 @@ const ReportsModal: React.FC<ReportsModalProps> = ({
     }
   };
 
-  const reportData: any = generateReportData();
+  // Build preview when employees or period changes
+  useEffect(() => {
+    let mounted = true;
+    const build = async () => {
+      if (!employees || employees.length === 0) return;
+      setPreviewLoading(true);
+      try {
+        const data = await buildReportData();
+        if (!mounted) return;
+        setReportPreview(data);
+      } catch (err) {
+        // ignore preview errors
+      } finally {
+        if (mounted) setPreviewLoading(false);
+      }
+    };
+    build();
+    return () => { mounted = false };
+  }, [employees, selectedPeriod, reportType]);
+
+  const reportData: any = reportPreview || buildReportData();
 
   if (!isOpen) return null;
 

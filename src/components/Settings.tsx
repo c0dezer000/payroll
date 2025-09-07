@@ -184,6 +184,17 @@ const Settings: React.FC = () => {
     }
   });
 
+  // Add Holiday modal state
+  const [showAddHolidayModal, setShowAddHolidayModal] = useState(false);
+  const [holidayForm, setHolidayForm] = useState({
+    englishName: "",
+    localName: "",
+    date: "",
+    type: "national",
+    allowancePercent: 0,
+    isActive: true,
+  });
+
   const availablePermissions = [
     { id: "dashboard", label: "Dashboard Access" },
     { id: "employees", label: "Employee Management" },
@@ -421,7 +432,10 @@ const Settings: React.FC = () => {
                   <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
                     Holiday Calendar & Allowances
                   </h3>
-                  <button className="bg-slate-900 hover:bg-slate-800 text-white px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 shadow-lg">
+                  <button
+                    onClick={() => setShowAddHolidayModal(true)}
+                    className="bg-slate-900 hover:bg-slate-800 text-white px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                  >
                     <Plus className="h-4 w-4" />
                     <span>Add Holiday</span>
                   </button>
@@ -543,6 +557,117 @@ const Settings: React.FC = () => {
                     </div>
                   ))}
                 </div>
+
+                {/* Add Holiday Modal */}
+                {showAddHolidayModal && (
+                  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-auto shadow-2xl">
+                      <div className="flex items-center justify-between p-6 sm:p-8 border-b border-slate-200 dark:border-slate-700">
+                        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Add Holiday</h2>
+                        <button onClick={() => setShowAddHolidayModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+                          <X className="h-5 w-5 sm:h-6 sm:w-6 text-slate-500" />
+                        </button>
+                      </div>
+
+                      <div className="p-6 sm:p-8 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">English Name</label>
+                            <input type="text" value={holidayForm.englishName} onChange={(e) => setHolidayForm({ ...holidayForm, englishName: e.target.value })} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white" placeholder="e.g. Independence Day" />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Local Name</label>
+                            <input type="text" value={holidayForm.localName} onChange={(e) => setHolidayForm({ ...holidayForm, localName: e.target.value })} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white" placeholder="e.g. Araw ng Kalayaan" />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Date</label>
+                            <input type="date" value={holidayForm.date} onChange={(e) => setHolidayForm({ ...holidayForm, date: e.target.value })} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type</label>
+                            <select value={holidayForm.type} onChange={(e) => setHolidayForm({ ...holidayForm, type: e.target.value })} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                              <option value="national">National</option>
+                              <option value="special_non_working">Special Non-Working</option>
+                              <option value="special_working">Special Working</option>
+                              <option value="local">Local</option>
+                              <option value="anniversary">Anniversary</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Allowance (%)</label>
+                            <input type="number" value={holidayForm.allowancePercent} onChange={(e) => setHolidayForm({ ...holidayForm, allowancePercent: Number(e.target.value) })} min={0} max={1000} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white" placeholder="e.g. 100 for 100%" />
+                          </div>
+
+                          <div className="flex items-center space-x-3">
+                            <label className="inline-flex items-center">
+                              <input type="checkbox" checked={holidayForm.isActive} onChange={(e) => setHolidayForm({ ...holidayForm, isActive: e.target.checked })} className="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 rounded" />
+                              <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">Active</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                          <button type="button" onClick={() => setShowAddHolidayModal(false)} className="px-6 py-3 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700">Cancel</button>
+                          <button type="button" onClick={async () => {
+                            // basic validation
+                            if (!holidayForm.date || (!holidayForm.englishName && !holidayForm.localName)) {
+                              alert('Please provide at least a name and date for the holiday.');
+                              return;
+                            }
+
+                            const newHoliday = {
+                              id: `manual-${Date.now()}`,
+                              name: holidayForm.localName || holidayForm.englishName,
+                              localName: holidayForm.localName || holidayForm.englishName,
+                              englishName: holidayForm.englishName || holidayForm.localName,
+                              date: holidayForm.date,
+                              type: (holidayForm.type as any) || 'national',
+                              description: holidayForm.englishName || holidayForm.localName || 'Added holiday',
+                              allowanceMultiplier: (holidayForm.allowancePercent || 0) / 100,
+                              isActive: !!holidayForm.isActive,
+                              eligibleReligions: ['all'],
+                            } as any;
+
+                            try {
+                              // persist to same cache key used by holiday utils
+                              const year = new Date(newHoliday.date).getFullYear();
+                              const cacheKey = `holidayCache-${year}`;
+                              let existing: any[] = [];
+                              try {
+                                const raw = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+                                if (raw) {
+                                  const parsed = JSON.parse(raw);
+                                  if (parsed && Array.isArray(parsed.data)) existing = parsed.data;
+                                }
+                              } catch (e) {
+                                // ignore
+                              }
+
+                              const combined = [newHoliday, ...existing];
+                              if (typeof window !== 'undefined') {
+                                (window as any).__APP_HOLIDAYS = combined;
+                                localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: combined }));
+                              }
+
+                              // update UI
+                              setHolidayList((prev) => [newHoliday, ...prev]);
+                              setShowAddHolidayModal(false);
+                              // reset form
+                              setHolidayForm({ englishName: '', localName: '', date: '', type: 'national', allowancePercent: 0, isActive: true });
+                            } catch (err) {
+                              console.error('Failed to add holiday', err);
+                              alert('Failed to add holiday. See console for details.');
+                            }
+                          }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200">Add Holiday</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-8 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6">
                   <div className="flex items-start space-x-3">
@@ -1115,7 +1240,7 @@ const Settings: React.FC = () => {
 
       {/* Add User Modal */}
       {showAddUserModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between p-6 sm:p-8 border-b border-slate-200 dark:border-slate-700">
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">

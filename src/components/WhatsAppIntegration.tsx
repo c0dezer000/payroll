@@ -14,6 +14,7 @@ import {
   getCurrentPeriod,
   calculatePayroll,
 } from "../utils/payroll";
+import { getCachedHolidaysForYear } from "../utils/holidays";
 
 interface MessageStatus {
   employeeId: string;
@@ -28,6 +29,8 @@ const WhatsAppIntegration: React.FC = () => {
   const [selectedPeriod] = useState(getCurrentPeriod());
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [computedPayslips, setComputedPayslips] = useState<Record<string, any>>({});
+  const [payslipsLoading, setPayslipsLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -47,6 +50,88 @@ const WhatsAppIntegration: React.FC = () => {
     fetchEmployees();
     return () => { mounted = false };
   }, []);
+
+  // Compute attendance-aware payslips for list preview
+  useEffect(() => {
+    let mounted = true;
+    const buildPayslips = async () => {
+      if (!employees || employees.length === 0) return;
+      setPayslipsLoading(true);
+      const isMonthly = selectedPeriod.includes("/");
+      const entries = await Promise.all(
+        employees.map(async (emp) => {
+          try {
+            let attendance: any = null;
+            if (isMonthly) {
+              const [mStr, yStr] = selectedPeriod.split("/");
+              const monthNum = Number(mStr);
+              const yearNum = Number(yStr);
+              if (monthNum && yearNum) {
+                const start = new Date(yearNum, monthNum - 1, 1);
+                const end = new Date(yearNum, monthNum, 0);
+                const holidays = getCachedHolidaysForYear(yearNum);
+                const countWorkDays = (s: Date, e: Date) => {
+                  let d = new Date(s);
+                  let count = 0;
+                  while (d <= e) {
+                    const day = d.getDay();
+                    if (day >= 1 && day <= 5) count++;
+                    d.setDate(d.getDate() + 1);
+                  }
+                  try {
+                    const holidayCount = (holidays || []).filter((h: any) => {
+                      if (!h || !h.date) return false;
+                      if (h.isActive === false) return false;
+                      if (h.type === "special_working") return false;
+                      const hd = new Date(h.date);
+                      return hd >= s && hd <= e && hd.getDay() >= 1 && hd.getDay() <= 5;
+                    }).length;
+                    count = Math.max(0, count - holidayCount);
+                  } catch (err) {}
+                  return count;
+                };
+
+                const res = await fetch(
+                  `/api/attendance?employeeId=${encodeURIComponent(emp.id)}&start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}`
+                );
+                if (res.ok) {
+                  const recs = await res.json();
+                  const records = Array.isArray(recs) ? recs : [];
+                  const totalOvertime = records.reduce((sum: number, rec: any) => sum + (Number(rec.overtimeHours) || 0), 0);
+                  const daysPresent = records.filter((rec: any) => rec.status === 'present' || (Number(rec.hoursWorked) || 0) > 0).length;
+                  const workDays = countWorkDays(start, end);
+                  attendance = {
+                    workDays,
+                    daysPresent,
+                    overtimeHours: Math.round(totalOvertime * 100) / 100,
+                    expectedHours: workDays * 8,
+                  };
+                }
+              }
+            }
+
+            const payslip = calculatePayroll(emp, selectedPeriod, attendance);
+            return [emp.id, payslip];
+          } catch (err) {
+            return [emp.id, null];
+          }
+        })
+      );
+
+      if (!mounted) return;
+      const map: Record<string, any> = {};
+      for (const pair of entries as Array<[string, any]>) {
+        const id = pair[0];
+        const ps = pair[1];
+        if (ps) map[id] = ps;
+      }
+      setComputedPayslips(map);
+      setPayslipsLoading(false);
+    };
+
+    buildPayslips();
+    return () => { mounted = false };
+  }, [employees, selectedPeriod]);
 
   const handleSelectAll = () => {
     if (selectedEmployees.length === employees.length) {
@@ -87,12 +172,15 @@ const WhatsAppIntegration: React.FC = () => {
         )
       );
 
-  const payslip = calculatePayroll(employee, selectedPeriod, null);
-      const message = `🌊 *ENJOY DIVE PAYROLL*\n\nHello ${
-        employee.name
-      },\n\nYour pay slip for ${selectedPeriod} is ready!\n\n💰 Net Salary: ${formatCurrency(
+      // Prefer precomputed attendance-aware payslip when available
+      const precomputed = computedPayslips[employeeId];
+      const payslip = precomputed ?? calculatePayroll(employee, selectedPeriod, null);
+
+      const message = `💼 *BAYANI PAYROLL*\n\nHello ${employee.name},\n\nYour pay slip for ${selectedPeriod} is ready!\n\n💰 Net Salary (Take-home): ${formatCurrency(
         payslip.netSalary
-      )}\n\nThank you for your dedication to Enjoy Dive! 🏊‍♂️`;
+      )}` +
+        (payslip.proratedBase && payslip.proratedBase !== payslip.baseSalary ? `\n📌 Prorated Base: ${formatCurrency(payslip.proratedBase)}` : "") +
+        `\n\nThank you for your dedication to Bayani Solutions!`;
 
       // Simulate sending delay
       await new Promise((resolve) => setTimeout(resolve, 1000));

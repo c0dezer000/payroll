@@ -80,7 +80,8 @@ export const getActiveHolidayForPeriod = (
 export const calculateHolidayAllowance = (
   employee: Employee,
   period: string,
-  holidays?: HolidayCalendar[]
+  holidays?: HolidayCalendar[],
+  baseAmount?: number
 ): { amount: number; type: string | null } => {
   const activeHoliday = getActiveHolidayForPeriod(period, holidays);
 
@@ -97,8 +98,11 @@ export const calculateHolidayAllowance = (
     return { amount: (employee.allowances?.holidayAllowance as number) || 0, type: null };
   }
 
+  // Determine which base to use for holiday calculation (prorated or full base)
+  const baseForCalculation = typeof baseAmount === "number" ? baseAmount : employee.baseSalary;
+
   // Calculate holiday allowance based on multiplier
-  const holidayAmount = employee.baseSalary * activeHoliday.allowanceMultiplier;
+  const holidayAmount = baseForCalculation * activeHoliday.allowanceMultiplier;
   const totalAmount = ((employee.allowances?.holidayAllowance as number) || 0) + holidayAmount;
 
   return { amount: totalAmount, type: activeHoliday.type };
@@ -138,9 +142,17 @@ export const calculatePayroll = (
   const overtimeRate = employee.overtimeRate || baseHourly * 1.25;
   const overtimePay = Math.max(0, overtimeHours) * overtimeRate;
 
-  // Calculate holiday allowance
+  // Prorate base salary by attendance if attendance provided (days-based)
+  let proratedBase = employee.baseSalary;
+  if (attendance && typeof attendance.workDays === "number" && typeof attendance.daysPresent === "number") {
+    const wd = Math.max(1, attendance.workDays);
+    const dp = Math.max(0, Math.min(wd, attendance.daysPresent));
+    proratedBase = (employee.baseSalary * dp) / wd;
+  }
+
+  // Calculate holiday allowance using prorated base so holiday multiplier is prorated by attendance
   const { amount: holidayAllowanceAmount, type: holidayType } =
-    calculateHolidayAllowance(employee, period);
+    calculateHolidayAllowance(employee, period, undefined, proratedBase);
 
   // Calculate tips (hanya untuk non-manajerial: dive master, supir, diving instructor)
   let tipsAmount = (employee.allowances?.tips as number) || 0;
@@ -162,6 +174,7 @@ export const calculatePayroll = (
     }
   }
 
+
   // Calculate total allowances (overtime included)
   const allowancesTotal =
     ((employee.allowances?.transport as number) || 0) +
@@ -170,14 +183,6 @@ export const calculatePayroll = (
     tipsAmount +
     holidayAllowanceAmount +
     overtimePay;
-
-  // Prorate base salary by attendance if attendance provided (days-based)
-  let proratedBase = employee.baseSalary;
-  if (attendance && typeof attendance.workDays === "number" && typeof attendance.daysPresent === "number") {
-    const wd = Math.max(1, attendance.workDays);
-    const dp = Math.max(0, Math.min(wd, attendance.daysPresent));
-    proratedBase = (employee.baseSalary * dp) / wd;
-  }
 
   // Calculate gross salary (before PPN)
   const grossSalaryBeforePPN = proratedBase + allowancesTotal;
